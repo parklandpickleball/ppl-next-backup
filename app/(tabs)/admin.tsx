@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 
-import { useAdminSession } from "./adminSession";
+import { useAdminSession } from "../../lib/adminSession";
 import { supabase } from "../../constants/supabaseClient";
 
 const ADMIN_CODE = "2468";

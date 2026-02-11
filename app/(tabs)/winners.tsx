@@ -16,11 +16,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import ImageViewer from "react-native-image-zoom-viewer";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
-import { decode } from "base64-arraybuffer";
+import { useFocusEffect } from "@react-navigation/native";
+
 
 import { supabase } from "../../constants/supabaseClient";
-import { useAdminSession } from "./adminSession";
+// ✅ IMPORTANT: this must be the tab-session hook
+import { useAdminSession } from "../../lib/adminSession";
 
 type PastWinnerRow = {
   id: string;
@@ -39,6 +40,7 @@ const COLORS = {
   blue: "#2563EB",
   cardBg: "#FFFFFF",
   soft: "#F3F4F6",
+  placeholder: "#6B7280", // ✅ make placeholders visible on native
 };
 
 function showMsg(title: string, message: string) {
@@ -71,7 +73,9 @@ export default function WinnersScreen() {
   const [saving, setSaving] = useState(false);
 
   const [isBackendAdmin, setIsBackendAdmin] = useState(false);
-  const canAdminEdit = !!isAdminUnlocked && !!isBackendAdmin;
+
+  // ✅ Show admin UI if locally unlocked OR backend admin.
+  const canAdminEdit = !!isAdminUnlocked || !!isBackendAdmin;
 
   const [rows, setRows] = useState<PastWinnerRow[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -133,6 +137,13 @@ export default function WinnersScreen() {
   useEffect(() => {
     void boot();
   }, [boot]);
+  // ✅ Refresh every time the tab is clicked / screen gains focus
+useFocusEffect(
+  useCallback(() => {
+    void boot();
+  }, [boot])
+);
+
 
   // ✅ Season order: Season 3 then 2 then 1
   const grouped = useMemo(() => {
@@ -149,7 +160,6 @@ export default function WinnersScreen() {
       const nb = seasonNumber(b);
       if (na !== -1 && nb !== -1) return nb - na;
 
-      // fallback: newest created season first
       const aLatest = seasonMap[a]?.[0]?.created_at
         ? new Date(seasonMap[a][0].created_at).getTime()
         : 0;
@@ -200,7 +210,7 @@ export default function WinnersScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        quality: 0.75, // smaller file
+        quality: 0.75,
       });
 
       if (result.canceled) return;
@@ -218,25 +228,22 @@ export default function WinnersScreen() {
     return data?.publicUrl ?? "";
   }, []);
 
-  // ✅ Expo-native safe upload (web uses blob; native uses base64->ArrayBuffer)
-  const uploadFileToStorage = useCallback(async (filename: string, uri: string, contentType: string) => {
-    if (Platform.OS === "web") {
+  // ✅ FIX: remove expo-file-system entirely (no deprecation warnings on native)
+  const uploadFileToStorage = useCallback(
+    async (filename: string, uri: string, contentType: string) => {
       const resp = await fetch(uri);
-      const blob = await resp.blob();
-      return await supabase.storage.from("past_winners").upload(filename, blob, {
+      if (!resp.ok) throw new Error(`Could not read image (${resp.status})`);
+
+      // works on web + native
+      const arrayBuffer = await resp.arrayBuffer();
+
+      return await supabase.storage.from("past_winners").upload(filename, arrayBuffer, {
         contentType,
         upsert: true,
       });
-    }
-
-    const base64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
-    const arrayBuffer = decode(base64);
-
-    return await supabase.storage.from("past_winners").upload(filename, arrayBuffer, {
-      contentType,
-      upsert: true,
-    });
-  }, []);
+    },
+    []
+  );
 
   const uploadAndSave = useCallback(async () => {
     if (!canAdminEdit) return;
@@ -268,13 +275,24 @@ export default function WinnersScreen() {
       const uploadRes = await uploadFileToStorage(filename, pickedUri, contentType);
       if (uploadRes.error) throw uploadRes.error;
 
-      const insertRes = await supabase.from("past_winners").insert({
-        season_label: s,
-        division_label: d,
-        winners_label: w,
-        photo_path: filename,
+      // ✅ MUST be logged in (Edge invoke uses auth headers)
+      const { data: userRes } = await supabase.auth.getUser();
+      if (!userRes?.user?.id) {
+        throw new Error("You are not logged in. Please sign in again.");
+      }
+
+      // ✅ Write via Edge Function (service role) to bypass RLS safely
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke("swift-handler", {
+        body: {
+          season_label: s,
+          division_label: d,
+          winners_label: w,
+          photo_path: filename,
+        },
       });
-      if (insertRes.error) throw insertRes.error;
+
+      if (fnErr) throw fnErr;
+      if ((fnData as any)?.error) throw new Error((fnData as any).error);
 
       setSeasonLabel("");
       setDivisionLabel("");
@@ -288,9 +306,17 @@ export default function WinnersScreen() {
     } finally {
       setSaving(false);
     }
-  }, [canAdminEdit, seasonLabel, divisionLabel, winnersLabel, pickedUri, loadWinners, uploadFileToStorage]);
+  }, [
+    canAdminEdit,
+    seasonLabel,
+    divisionLabel,
+    winnersLabel,
+    pickedUri,
+    loadWinners,
+    uploadFileToStorage,
+  ]);
 
-  // ✅ Delete: DB row + storage file
+  // ✅ Delete: DB row + storage file (keep it simple — uses your existing policy)
   const deleteWinner = useCallback(
     async (row: PastWinnerRow) => {
       if (!canAdminEdit) return;
@@ -309,8 +335,13 @@ export default function WinnersScreen() {
 
       setSaving(true);
       try {
-        const delRow = await supabase.from("past_winners").delete().eq("id", row.id);
-        if (delRow.error) throw delRow.error;
+        const { data: delFnData, error: delFnErr } = await supabase.functions.invoke("swift-handler", {
+  body: { action: "delete", id: row.id },
+});
+
+if (delFnErr) throw delFnErr;
+if ((delFnData as any)?.error) throw new Error((delFnData as any).error);
+
 
         const delObj = await supabase.storage.from("past_winners").remove([row.photo_path]);
         if (delObj.error) {
@@ -327,7 +358,6 @@ export default function WinnersScreen() {
     [canAdminEdit, loadWinners]
   );
 
-  // Smaller, safer display size
   const screenW = Dimensions.get("window").width;
   const maxW = Math.min(screenW - 28, 820);
   const photoHeight = Math.round(maxW * 0.42);
@@ -355,7 +385,6 @@ export default function WinnersScreen() {
           </View>
         ) : null}
 
-        {/* Admin add form */}
         {canAdminEdit ? (
           <View style={styles.adminCard}>
             <Text style={styles.adminTitle}>Admin: Add Winner</Text>
@@ -364,6 +393,7 @@ export default function WinnersScreen() {
               value={seasonLabel}
               onChangeText={setSeasonLabel}
               placeholder='Season (ex: "Season 3")'
+              placeholderTextColor={COLORS.placeholder}
               style={styles.input}
               autoCapitalize="words"
             />
@@ -372,6 +402,7 @@ export default function WinnersScreen() {
               value={divisionLabel}
               onChangeText={setDivisionLabel}
               placeholder='Division (ex: "Gold Division")'
+              placeholderTextColor={COLORS.placeholder}
               style={styles.input}
               autoCapitalize="words"
             />
@@ -380,6 +411,7 @@ export default function WinnersScreen() {
               value={winnersLabel}
               onChangeText={setWinnersLabel}
               placeholder='Winners (ex: "Eric / Adam")'
+              placeholderTextColor={COLORS.placeholder}
               style={styles.input}
               autoCapitalize="words"
             />
@@ -408,7 +440,6 @@ export default function WinnersScreen() {
           </View>
         ) : null}
 
-        {/* Gallery */}
         {rows.length === 0 ? (
           <Text style={{ marginTop: 14, fontWeight: "900", color: COLORS.text }}>
             No winners added yet.
@@ -480,7 +511,6 @@ export default function WinnersScreen() {
         )}
       </ScrollView>
 
-      {/* ✅ Click-to-enlarge modal (Pinch-to-zoom) */}
       <Modal
         visible={!!previewUrl}
         transparent
@@ -491,33 +521,30 @@ export default function WinnersScreen() {
       >
         <SafeAreaView style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.85)" }}>
           <ImageViewer
-  imageUrls={previewUrl ? [{ url: previewUrl }] : []}
-  enableSwipeDown
-  onSwipeDown={() => setPreviewUrl(null)}
-  onCancel={() => setPreviewUrl(null)}
-  renderIndicator={() => <View />}
-  saveToLocalByLongPress={false}
-  backgroundColor="rgba(0,0,0,0.85)"
-/>
+            imageUrls={previewUrl ? [{ url: previewUrl }] : []}
+            enableSwipeDown
+            onSwipeDown={() => setPreviewUrl(null)}
+            onCancel={() => setPreviewUrl(null)}
+            renderIndicator={() => <View />}
+            saveToLocalByLongPress={false}
+            backgroundColor="rgba(0,0,0,0.85)"
+          />
 
-<View style={{ paddingVertical: 14, alignItems: "center" }}>
-  <Pressable
-    onPress={() => setPreviewUrl(null)}
-    style={{
-      paddingVertical: 10,
-      paddingHorizontal: 28,
-      borderRadius: 999,
-      backgroundColor: "rgba(0,0,0,0.7)",
-      borderWidth: 1,
-      borderColor: "rgba(255,255,255,0.3)",
-    }}
-  >
-    <Text style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>
-      Close
-    </Text>
-  </Pressable>
-</View>
-
+          <View style={{ paddingVertical: 14, alignItems: "center" }}>
+            <Pressable
+              onPress={() => setPreviewUrl(null)}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 28,
+                borderRadius: 999,
+                backgroundColor: "rgba(0,0,0,0.7)",
+                borderWidth: 1,
+                borderColor: "rgba(255,255,255,0.3)",
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>Close</Text>
+            </Pressable>
+          </View>
         </SafeAreaView>
       </Modal>
     </View>
@@ -607,37 +634,4 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   deleteBtnText: { color: "#DC2626", fontWeight: "900" },
-
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    padding: 14,
-    justifyContent: "center",
-  },
-  modalCard: {
-    backgroundColor: "#111",
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  modalImage: {
-    width: "100%",
-    height: 420,
-    backgroundColor: "#000",
-  },
-
-  // Close button (kept in your styles; now used in the zoom viewer)
-  modalClose: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  modalCloseText: { color: "#fff", fontWeight: "900" },
 });

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from "react";
-import { supabase } from "../../constants/supabaseClient";
+import { supabase } from "../constants/supabaseClient";
 
 type AdminSessionContextValue = {
   isAdminUnlocked: boolean;

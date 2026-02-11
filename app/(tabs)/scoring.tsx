@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { supabase } from "../../constants/supabaseClient";
-import { useAdminSession } from "./adminSession";
+import { useAdminSession } from "../../lib/adminSession";
 
 /**
  * PPL NEXT - SCORING TAB

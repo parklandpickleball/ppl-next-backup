@@ -8,6 +8,7 @@ import {
   View,
   ActivityIndicator,
   Platform,
+  Modal,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/constants/supabaseClient";
@@ -47,6 +48,10 @@ export default function LeagueLockScreen() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Admin setup modal (cross-platform)
+  const [adminModalOpen, setAdminModalOpen] = useState(false);
+  const [adminPass, setAdminPass] = useState("");
 
   useEffect(() => {
     const ensureSessionAndLoad = async () => {
@@ -141,6 +146,24 @@ export default function LeagueLockScreen() {
     router.replace("choose-team" as any);
   };
 
+  const openAdminSetup = () => {
+    setAdminPass("");
+    setAdminModalOpen(true);
+  };
+
+  const confirmAdminSetup = async () => {
+    const pass = adminPass.trim();
+    if (pass !== "2468") {
+      Alert.alert("Wrong passcode", "That admin passcode is not correct.");
+      return;
+    }
+
+    setAdminModalOpen(false);
+
+    // Go straight to Admin tab (bypass teams/players)
+    router.replace("/(tabs)/admin" as any);
+  };
+
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
@@ -183,12 +206,106 @@ export default function LeagueLockScreen() {
           paddingVertical: 14,
           borderRadius: 12,
           alignItems: "center",
+          marginBottom: 12,
         }}
       >
         <Text style={{ color: "white", fontWeight: "900", fontSize: 16 }}>
           Unlock
         </Text>
       </Pressable>
+
+      <Pressable
+        onPress={openAdminSetup}
+        style={{
+          backgroundColor: "#ddd",
+          paddingVertical: 12,
+          borderRadius: 12,
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ color: "#000", fontWeight: "900", fontSize: 14 }}>
+          Admin Setup
+        </Text>
+      </Pressable>
+
+      {/* Admin passcode modal (works on iOS/Android/Web) */}
+      <Modal
+        visible={adminModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAdminModalOpen(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "white",
+              borderRadius: 14,
+              padding: 16,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "900", marginBottom: 8 }}>
+              Admin Setup
+            </Text>
+            <Text style={{ color: "#444", marginBottom: 12 }}>
+              Enter admin passcode to open Admin (works even if no teams exist).
+            </Text>
+
+            <TextInput
+              value={adminPass}
+              onChangeText={setAdminPass}
+              placeholder="Admin passcode"
+              secureTextEntry
+              autoCorrect={false}
+              style={{
+                borderWidth: 2,
+                borderColor: "#000",
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                fontSize: 16,
+                marginBottom: 12,
+              }}
+            />
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <Pressable
+                onPress={() => setAdminModalOpen(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: "#ddd",
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontWeight: "900" }}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={confirmAdminSetup}
+                style={{
+                  flex: 1,
+                  backgroundColor: "black",
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "white", fontWeight: "900" }}>
+                  Continue
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

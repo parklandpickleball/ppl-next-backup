@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { supabase } from "../../constants/supabaseClient";
-import { useAdminSession } from "./adminSession";
+import { useAdminSession } from "../../lib/adminSession";
 import Logo from "../../components/ui/logo";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
@@ -98,10 +98,8 @@ export default function AnnouncementsScreen() {
   // ✅ PUSH: run once, non-blocking, and NEVER on web
   const registerForPushNotifications = useCallback(async () => {
     try {
-      // Web will never show an iOS prompt and can hang token calls
       if (Platform.OS === "web") return;
 
-      // If you already granted permission, iOS will NOT prompt again (this is normal).
       const perms = await Notifications.getPermissionsAsync();
       let finalStatus = perms.status;
 
@@ -115,7 +113,6 @@ export default function AnnouncementsScreen() {
         return;
       }
 
-      // ✅ SDK 54: include projectId so Expo can generate a token (fixes “no projectId found”)
       const projectId =
         Constants?.expoConfig?.extra?.eas?.projectId ||
         (Constants as any)?.easConfig?.projectId ||
@@ -128,9 +125,7 @@ export default function AnnouncementsScreen() {
       }
 
       const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-      await registerExpoPushToken({
-  expoPushToken: token,
-});
+      await registerExpoPushToken({ expoPushToken: token });
 
       console.log("✅ EXPO PUSH TOKEN:", token);
     } catch (e: any) {
@@ -157,23 +152,34 @@ export default function AnnouncementsScreen() {
   const loadMe = useCallback(
     async (sid: string | null) => {
       try {
-        const { data } = await supabase.auth.getUser();
-        const uid = data?.user?.id ?? null;
-        setMeId(uid);
+        let { data } = await supabase.auth.getUser();
+let uid = data?.user?.id ?? null;
 
-        // If AdminSession is unlocked, always post as ADMIN
-        if (isAdmin) {
-          setMeName("ADMIN");
-          return;
-        }
+// If AdminSession is unlocked, always post as ADMIN
+if (isAdmin) {
+  setMeId(uid);
+  setMeName("ADMIN");
+  return;
+}
 
-        // If no auth user, fallback to Community (still allowed by your current RLS)
-        if (!uid) {
-          setMeName("Community");
-          return;
-        }
+// ✅ If no auth user, silently sign in anonymously so posts have author_id
+if (!uid) {
+  const { error } = await supabase.auth.signInAnonymously();
+  if (error) throw error;
 
-        // ✅ Pull player + team from the same gate source used elsewhere
+  const { data: d2 } = await supabase.auth.getUser();
+  uid = d2?.user?.id ?? null;
+}
+
+setMeId(uid);
+
+// Still no uid? then truly fallback
+if (!uid) {
+  setMeName("Community");
+  return;
+}
+
+
         const { data: profile } = await supabase
           .from("user_season_profiles")
           .select("player_name, team_id")
@@ -195,7 +201,6 @@ export default function AnnouncementsScreen() {
           teamName = (team?.team_name ?? "").trim();
         }
 
-        // Format: Brandon (Ikewa) OR Brandon
         if (player) {
           const label = teamName ? `${player} (${teamName})` : `${player}`;
           setMeName(label);
@@ -218,7 +223,6 @@ export default function AnnouncementsScreen() {
 
     setErrorMsg("");
 
-    // Load announcements (new schema)
     const { data: annRows, error: annErr } = await supabase
       .from("announcements")
       .select("id,season_id,author_id,author_name,is_admin,body,created_at")
@@ -239,7 +243,6 @@ export default function AnnouncementsScreen() {
 
     const ids = anns.map((a) => a.id);
 
-    // Load replies
     const { data: repRows, error: repErr } = await supabase
       .from("announcement_replies")
       .select("id,announcement_id,season_id,author_id,author_name,is_admin,body,created_at")
@@ -247,7 +250,6 @@ export default function AnnouncementsScreen() {
       .order("created_at", { ascending: true });
 
     if (repErr) {
-      // Still show announcements even if replies fail
       const postsNoReplies: Post[] = anns.map((a) => ({ ...a, replies: [] }));
       setPosts(postsNoReplies);
       return;
@@ -275,17 +277,14 @@ export default function AnnouncementsScreen() {
     setLoading(false);
   }, [loadSeason, loadMe, loadAll]);
 
-  // Initial load
   useEffect(() => {
     void boot();
   }, [boot]);
 
-  // ✅ PUSH: run once AFTER first render, and do NOT block the screen
   useEffect(() => {
     void registerForPushNotifications();
   }, [registerForPushNotifications]);
 
-  // ✅ Refresh whenever this tab is tapped/focused
   useFocusEffect(
     useCallback(() => {
       void boot();
@@ -293,27 +292,33 @@ export default function AnnouncementsScreen() {
   );
 
   const postingAsLabel = useMemo(() => {
-    return `Posting as: ${isAdmin ? "ADMIN" : "Community"}`;
-  }, [isAdmin]);
+    return `Posting as: ${isAdmin ? "ADMIN" : meName}`;
+  }, [isAdmin, meName]);
 
-  const canDeleteAnnouncement = (p: AnnouncementRow) => {
-    if (isAdmin) return true;
+  // ✅ CORRECT RULE:
+  // - Admin (unlocked) can delete any
+  // - Users can delete ONLY if author_id === meId
+  // - NO name-based fallback (that was allowing unintended deletes)
+ const canDeleteAnnouncement = (p: AnnouncementRow) => {
+  if (isAdmin) return true;
+  if (!meId) return false;
 
-    // Prefer auth ownership when available
-    if (meId && (p.author_id ?? null) === meId) return true;
+  // ✅ Non-admin users can NEVER delete admin posts (even if author_id matches)
+  if (p.is_admin) return false;
 
-    // Fallback: allow delete when the visible author matches who you're posting as
-    // (and never allow community users to delete admin posts)
-    return !p.is_admin && (p.author_name || "").trim() === (meName || "").trim();
-  };
+  return (p.author_id ?? null) === meId;
+};
 
-  const canDeleteReply = (r: ReplyRow) => {
-    if (isAdmin) return true;
+const canDeleteReply = (r: ReplyRow) => {
+  if (isAdmin) return true;
+  if (!meId) return false;
 
-    if (meId && (r.author_id ?? null) === meId) return true;
+  // ✅ Non-admin users can NEVER delete admin replies
+  if (r.is_admin) return false;
 
-    return !r.is_admin && (r.author_name || "").trim() === (meName || "").trim();
-  };
+  return (r.author_id ?? null) === meId;
+};
+
 
   const postAnnouncement = async () => {
     const body = (text ?? "").trim();
@@ -380,8 +385,19 @@ export default function AnnouncementsScreen() {
     if (!ok) return;
 
     try {
-      const { error } = await supabase.from("announcements").delete().eq("id", p.id);
+      const { data: deleted, error } = await supabase
+        .from("announcements")
+        .delete()
+        .eq("id", p.id)
+        .select("id");
+
       if (error) throw error;
+
+      // ✅ If RLS blocks, sometimes you get 0 rows deleted without a helpful error
+      if (!deleted || deleted.length === 0) {
+        throw new Error("Delete was blocked by permissions (RLS).");
+      }
+
       await loadAll(seasonId);
     } catch (e: any) {
       Alert.alert("Delete failed", e?.message || "Could not delete.");
@@ -395,8 +411,18 @@ export default function AnnouncementsScreen() {
     if (!ok) return;
 
     try {
-      const { error } = await supabase.from("announcement_replies").delete().eq("id", r.id);
+      const { data: deleted, error } = await supabase
+        .from("announcement_replies")
+        .delete()
+        .eq("id", r.id)
+        .select("id");
+
       if (error) throw error;
+
+      if (!deleted || deleted.length === 0) {
+        throw new Error("Delete was blocked by permissions (RLS).");
+      }
+
       await loadAll(seasonId);
     } catch (e: any) {
       Alert.alert("Delete failed", e?.message || "Could not delete.");
@@ -415,7 +441,6 @@ export default function AnnouncementsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        {/* ✅ One scroll surface so you can scroll from the top area too */}
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 30 }}>
           <Text style={{ fontSize: 28, fontWeight: "900", color: COLORS.text }}>Announcements</Text>
           <Text style={{ marginTop: 6, fontSize: 14, fontWeight: "800", color: COLORS.subtext }}>
@@ -437,7 +462,6 @@ export default function AnnouncementsScreen() {
             </View>
           ) : null}
 
-          {/* Composer */}
           <View
             style={{
               marginTop: 12,
@@ -478,7 +502,6 @@ export default function AnnouncementsScreen() {
             </Pressable>
           </View>
 
-          {/* Feed */}
           <View style={{ marginTop: 14, gap: 12 }}>
             {posts.length === 0 ? (
               <Text style={{ marginTop: 6, fontWeight: "900", color: COLORS.text }}>No announcements yet.</Text>
@@ -537,7 +560,6 @@ export default function AnnouncementsScreen() {
                       </Text>
                     </Pressable>
 
-                    {/* Reply composer */}
                     {replyingTo === p.id ? (
                       <View style={{ marginTop: 10, gap: 8 }}>
                         <TextInput
@@ -571,7 +593,6 @@ export default function AnnouncementsScreen() {
                       </View>
                     ) : null}
 
-                    {/* Replies */}
                     {p.replies.length ? (
                       <View style={{ marginTop: 12, gap: 8 }}>
                         {p.replies.map((r) => (

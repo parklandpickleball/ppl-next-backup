@@ -19,6 +19,10 @@ import { supabase } from "@/constants/supabaseClient";
 import * as FileSystem from "expo-file-system/legacy";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect } from "@react-navigation/native";
+import { useAdminSession } from "@/lib/adminSession";
+
+
 
 type UploadRow = {
   path: string; // "shared/filename.jpg"
@@ -56,6 +60,9 @@ function basename(p: string) {
 
 export default function PhotosSimple() {
   const { width, height } = useWindowDimensions();
+    const adminSession = useAdminSession() as any;
+  const unlockedAdmin = !!adminSession?.isAdminUnlocked;
+
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [err, setErr] = useState<string>("");
@@ -99,6 +106,13 @@ export default function PhotosSimple() {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useFocusEffect(
+  React.useCallback(() => {
+    // Refresh every time the Photos tab is opened/tapped
+    refreshList();
+  }, [])
+);
+
 
   async function init() {
     try {
@@ -383,10 +397,11 @@ export default function PhotosSimple() {
   const currentName = currentPath ? basename(currentPath) : "Photo";
 
   const canDeleteCurrent = useMemo(() => {
-    if (!userId || !currentRow) return false;
-    if (isAdmin) return true;
-    return currentRow.uploader === userId;
-  }, [userId, isAdmin, currentRow]);
+  if (!userId || !currentRow) return false;
+  if (isAdmin || unlockedAdmin) return true;
+  return currentRow.uploader === userId;
+}, [userId, isAdmin, unlockedAdmin, currentRow]);
+
 
   const hasPrev = viewerIndex > 0;
   const hasNext = viewerIndex >= 0 && viewerIndex < rows.length - 1;
@@ -450,11 +465,28 @@ export default function PhotosSimple() {
       const { error: delErr } = await supabase.storage.from(BUCKET).remove([currentPath]);
       if (delErr) throw delErr;
 
-      const { error: rowDelErr } = await supabase.from("photo_uploads").delete().eq("path", currentPath);
+      const { data: deletedRows, error: rowDelErr } = await supabase
+  .from("photo_uploads")
+  .delete()
+  .eq("path", currentPath)
+  .select("path");
+
+if (rowDelErr) throw rowDelErr;
+
+// ✅ IMPORTANT: If RLS blocks delete, Supabase can return 0 deleted rows with NO error.
+// Treat that as a failure so we don't "fake delete" in the UI.
+if (!deletedRows || deletedRows.length === 0) {
+  throw new Error(
+    "Delete was blocked by permissions (RLS). You are seeing a local UI delete only. Fix the photo_uploads delete policy."
+  );
+}
+
       if (rowDelErr) throw rowDelErr;
 
       const newRows = rows.filter((r) => r.path !== currentPath);
       setRows(newRows);
+      await refreshList();
+
 
       setConfirmingDelete(false);
 
@@ -526,7 +558,11 @@ export default function PhotosSimple() {
             {!!err && <Text style={styles.err}>{err}</Text>}
 
             <Text style={styles.sub}>
-              {userId ? `Signed in ✅ ${isAdmin ? "(Admin)" : ""}` : "Not signed in (view-only)"}
+{userId
+  ? `Signed in ✅ ${(isAdmin || unlockedAdmin) ? "(Admin)" : ""}`
+  : "Not signed in (view-only)"}
+
+
             </Text>
 
             <View style={styles.row}>
