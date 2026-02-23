@@ -145,7 +145,12 @@ export default function ScheduleScreen() {
   // (Button can exist now; filtering logic will be wired after team/player selection exists)
   const [showOnlyMine, setShowOnlyMine] = useState(false);
     // ✅ Gate selection: the user's chosen team for this season (used by "Show only my schedule")
-  const [myTeamId, setMyTeamId] = useState<string | null>(null);
+ const [myTeamId, setMyTeamId] = useState<string | null>(null);
+
+// ✅ Dues banner (dismissible)
+const [myPlayerName, setMyPlayerName] = useState<string>("");
+const [duesPaid, setDuesPaid] = useState(true);
+const [duesDismissed, setDuesDismissed] = useState(false);
 
 
   const boot = useCallback(async () => {
@@ -173,24 +178,72 @@ export default function ScheduleScreen() {
 
         // Load myTeamId from the Choose Team / Player gate
     try {
-      const userRes = await supabase.auth.getUser();
-      const uid = userRes.data.user?.id ?? null;
+    
+  const userRes = await supabase.auth.getUser();
+  const uid = userRes.data.user?.id ?? null;
 
-      if (uid) {
-        const { data: profile } = await supabase
-          .from("user_season_profiles")
-          .select("team_id")
-          .eq("user_id", uid)
-          .eq("season_id", sid)
-          .maybeSingle<any>();
+  if (uid) {
+    const { data: profile } = await supabase
+      .from("user_season_profiles")
+      .select("team_id, player_name")
+      .eq("user_id", uid)
+      .eq("season_id", sid)
+      .maybeSingle<any>();
 
-        setMyTeamId(profile?.team_id ?? null);
-      } else {
-        setMyTeamId(null);
+    const teamId = profile?.team_id ?? null;
+    const playerName = (profile?.player_name ?? "").trim();
+
+    setMyTeamId(teamId);
+    setMyPlayerName(playerName);
+
+    // ✅ Dues check (based on teams.player1_paid / player2_paid)
+    if (teamId) {
+      const { data: teamRow } = await supabase
+        .from("teams")
+        .select("id, player1_name, player2_name, player1_paid, player2_paid")
+        .eq("id", teamId)
+        .eq("season_id", sid)
+        .maybeSingle<any>();
+
+      const p1Name = (teamRow?.player1_name ?? "").trim();
+      const p2Name = (teamRow?.player2_name ?? "").trim();
+      const p1Paid = !!teamRow?.player1_paid;
+      const p2Paid = !!teamRow?.player2_paid;
+
+      let isPaid = true;
+
+      // If we can match which player they are, use that paid flag.
+      if (playerName && p1Name && playerName.toLowerCase() === p1Name.toLowerCase()) isPaid = p1Paid;
+      else if (playerName && p2Name && playerName.toLowerCase() === p2Name.toLowerCase()) isPaid = p2Paid;
+      else {
+        // Fallback: treat team paid only if BOTH are paid
+        isPaid = p1Paid && p2Paid;
       }
-    } catch {
+
+      setDuesPaid(isPaid);
+
+      // If they become paid, clear dismissal and hide banner
+      if (isPaid) {
+        setDuesDismissed(false);
+      }
+    } else {
       setMyTeamId(null);
+      setMyPlayerName("");
+      setDuesPaid(true);
+      setDuesDismissed(false);
     }
+  } else {
+    setMyTeamId(null);
+    setMyPlayerName("");
+    setDuesPaid(true);
+    setDuesDismissed(false);
+  }
+} catch {
+  setMyTeamId(null);
+  setMyPlayerName("");
+  setDuesPaid(true);
+  setDuesDismissed(false);
+}
 
     const { data: season } = await supabase
       .from("seasons")
@@ -321,10 +374,12 @@ const { data: matchRows, error: matchErr } = await q
   }, [loadWeek]);
 
   useFocusEffect(
-    useCallback(() => {
-      void boot();
-    }, [boot])
-  );
+  useCallback(() => {
+    // ✅ Show banner again every time user returns to Schedule (unless they are paid)
+    setDuesDismissed(false);
+    void boot();
+  }, [boot])
+);
 
   useFocusEffect(
     useCallback(() => {
@@ -403,12 +458,62 @@ const { data: matchRows, error: matchErr } = await q
             Schedule
           </Text>
           <Text style={{ marginTop: 4, color: COLORS.subtext, fontWeight: "700" }}>
-            {seasonName ? `Season: ${seasonName}` : "Season"}
-          </Text>
+  {(() => {
+    const seasonLabel = seasonName ? seasonName.replace(/^Season\s*/i, "").trim() : "";
+    const latestWeek = weeks.length ? weeks[weeks.length - 1].week : null;
+
+    if (!seasonLabel && latestWeek == null) return "Season";
+    if (!seasonLabel) return `Week ${latestWeek}`;
+    if (latestWeek == null) return `Season: ${seasonLabel}`;
+
+    return `Season: ${seasonLabel} - Week ${latestWeek}`;
+  })()}
+</Text>
         </View>
 
-        {/* Week Dropdown */}
-        <Pressable
+{/* ✅ DUES BANNER (dismissible) */}
+{!duesPaid && !duesDismissed ? (
+  <View
+    style={{
+      borderWidth: 2,
+      borderColor: "#cc0000",
+      backgroundColor: "#FEF3C7",
+      borderRadius: 14,
+      padding: 12,
+      marginBottom: 12,
+    }}
+  >
+    <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontWeight: "900", color: "#111", fontSize: 15 }}>
+          ***LEAGUE DUES OUTSTANDING***
+        </Text>
+        <Text style={{ marginTop: 4, fontWeight: "800", color: "#111" }}>
+          Please arrange payment with a league administrator at your earliest convenience.
+        </Text>
+      </View>
+
+      <Pressable
+        onPress={() => setDuesDismissed(true)}
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 999,
+          borderWidth: 2,
+          borderColor: "#111",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#fff",
+        }}
+      >
+        <Text style={{ fontWeight: "900", color: "#111", fontSize: 16 }}>✕</Text>
+      </Pressable>
+    </View>
+  </View>
+) : null}
+
+{/* Week Dropdown */}
+<Pressable
           onPress={() => setWeekPickerOpen(true)}
           style={{
             paddingVertical: 14,

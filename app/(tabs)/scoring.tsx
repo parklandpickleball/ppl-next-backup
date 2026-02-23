@@ -754,8 +754,17 @@ export default function ScoringScreen() {
           </Text>
 
           <Text style={{ marginTop: 4, color: COLORS.subtext, fontWeight: "700" }}>
-            {seasonName ? `Season: ${seasonName}` : "Season"}
-          </Text>
+  {(() => {
+    const seasonLabel = seasonName ? seasonName.replace(/^Season\s*/i, "").trim() : "";
+    const latestWeek = weeks.length ? weeks[weeks.length - 1].week : null;
+
+    if (!seasonLabel && latestWeek == null) return "Season";
+    if (!seasonLabel) return `Week ${latestWeek}`;
+    if (latestWeek == null) return `Season: ${seasonLabel}`;
+
+    return `Season: ${seasonLabel} - Week ${latestWeek}`;
+  })()}
+</Text>
         </View>
 
         <Pressable

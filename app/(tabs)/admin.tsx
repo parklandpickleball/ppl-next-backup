@@ -9,13 +9,28 @@ import {
   View,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-
 import { useAdminSession } from "../../lib/adminSession";
 import { supabase } from "../../constants/supabaseClient";
-
 const ADMIN_CODE = "2468";
 
 export default function AdminTab() {
+    const [playoffMode, setPlayoffMode] = useState(false);
+    useFocusEffect(
+  React.useCallback(() => {
+    const loadPlayoffMode = async () => {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("playoff_mode")
+        .limit(1)
+        .maybeSingle();
+
+      setPlayoffMode(!!data?.playoff_mode);
+    };
+
+    loadPlayoffMode();
+  }, [])
+);
+
   const { isAdminUnlocked, unlockAdmin, lockAdmin } = useAdminSession();
 
   const [code, setCode] = useState("");
@@ -130,7 +145,7 @@ export default function AdminTab() {
           <Text style={styles.bigBtnText}>Manage Teams</Text>
         </Pressable>
 
-        {/* 4. Schedule Builder */}
+                {/* 4. Schedule Builder */}
         <Pressable
           style={styles.bigBtn}
           onPress={() => router.push({ pathname: "/schedule-builder" } as any)}
@@ -138,7 +153,23 @@ export default function AdminTab() {
           <Text style={styles.bigBtnText}>Schedule Builder</Text>
         </Pressable>
 
-        {/* 5. Lock Admin */}
+               {/* 5. Playoff Mode */}
+        <Pressable
+          style={[
+            styles.bigBtn,
+            playoffMode && { backgroundColor: "#065F46" }
+          ]}
+          onPress={() => router.push({ pathname: "/playoff-mode" } as any)}
+        >
+          <Text style={styles.bigBtnText}>
+            {playoffMode
+              ? "Playoff Mode - ACTIVATED"
+              : "Playoff Mode - NOT ACTIVATED"}
+          </Text>
+        </Pressable>
+
+
+        {/* 6. Lock Admin */}
         <Pressable style={[styles.bigBtn, styles.lockBtn]} onPress={lockAdmin}>
           <Text style={styles.bigBtnText}>Lock Admin</Text>
         </Pressable>

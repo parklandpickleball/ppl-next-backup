@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  StyleSheet,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/constants/supabaseClient";
@@ -94,7 +95,8 @@ export default function LeagueLockScreen() {
       // ✅ if device already unlocked THIS season, skip password screen
       const acceptedSeasonId = await getAcceptedSeasonId();
       if (acceptedSeasonId && acceptedSeasonId === data.current_season_id) {
-        router.replace("choose-team" as any);
+        router.replace("/choose-team" as any);
+
         return;
       }
 
@@ -143,7 +145,7 @@ export default function LeagueLockScreen() {
     // ✅ remember this device has unlocked THIS season
     await setAcceptedSeasonId(settings.current_season_id);
 
-    router.replace("choose-team" as any);
+    router.replace("/choose-team" as any);
   };
 
   const openAdminSetup = () => {
@@ -173,10 +175,17 @@ export default function LeagueLockScreen() {
   }
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
-      <Text style={{ fontSize: 28, fontWeight: "900", marginBottom: 10 }}>
-        Parkland Pickleball League
-      </Text>
+  <View style={{ flex: 1, justifyContent: "center", padding: 24 }}>
+    {Platform.OS === "web" && (
+      <Pressable onPress={() => router.replace("/home" as any)} style={styles.backLink}>
+        <Text style={styles.backLinkText}>← Back to Homepage</Text>
+      </Pressable>
+    )}
+
+    <Text style={{ fontSize: 28, fontWeight: "900", marginBottom: 10 }}>
+      Parkland Pickleball League
+    </Text>
+
 
       <Text style={{ marginBottom: 16 }}>
         Enter the league access code to continue.
@@ -309,3 +318,14 @@ export default function LeagueLockScreen() {
     </View>
   );
 }
+const styles = StyleSheet.create({
+  backLink: {
+    alignSelf: "flex-start",
+    marginBottom: 14,
+  },
+  backLinkText: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: "#111827",
+  },
+});

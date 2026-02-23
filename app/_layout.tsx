@@ -84,12 +84,27 @@ export default function RootLayout() {
   }
 
   const isOnLeagueLock = pathname === "/league-lock";
+    // ✅ WEB ONLY: if someone visits the root site while "locked", send them to the public homepage
+  // This prevents the hard gate from hijacking "/" before app/index.tsx can redirect.
+  
+
+        const isPublicWebRoute =
+  Platform.OS === "web" &&
+  (pathname === "" ||
+    pathname === "/" ||
+    pathname === "/home" ||
+    pathname === "/member-login" ||
+    pathname === "/attendance");
+
+
+
 
 
   // ✅ HARD GATE: if locked, force league-lock no matter where they are
-  if (locked && !isOnLeagueLock) {
+    if (locked && !isOnLeagueLock && !isPublicWebRoute) {
     return <Redirect href="/league-lock" />;
   }
+
 
   return (
     <SafeAreaProvider>

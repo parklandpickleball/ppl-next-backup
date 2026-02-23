@@ -1,5 +1,5 @@
 import { Tabs, useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
 
 import { HapticTab } from "@/components/haptic-tab";
@@ -18,6 +18,22 @@ export default function TabLayout() {
   const currentSeasonRef = useRef<string | null>(null);
   const kickedRef = useRef(false);
   const intervalRef = useRef<any>(null);
+  const [playoffEnabled, setPlayoffEnabled] = useState(false);
+
+  const loadPlayoffEnabled = async () => {
+  const { data, error } = await supabase
+    .from("app_settings")
+    .select("playoff_mode")
+    .single();
+
+  if (error) {
+    console.log("Playoff mode check: load error", error);
+    return false;
+  }
+
+  return !!data?.playoff_mode;
+};
+
 
   const loadSeasonId = async () => {
     const { data, error } = await supabase
@@ -49,11 +65,16 @@ export default function TabLayout() {
     const latest = await loadSeasonId();
     const prev = currentSeasonRef.current;
 
-    // First run: just set baseline
-    if (!prev) {
-      currentSeasonRef.current = latest;
-      return;
-    }
+   // First run: just set baseline + playoff status
+if (!prev) {
+  currentSeasonRef.current = latest;
+
+  const enabled = await loadPlayoffEnabled();
+  setPlayoffEnabled(enabled);
+
+  return;
+}
+
 
     if (latest && latest !== prev) {
       console.log("✅ Season changed detected (poll/focus). Kicking user.", {
@@ -63,6 +84,8 @@ export default function TabLayout() {
       currentSeasonRef.current = latest;
       await kickToLeagueLock();
     }
+    const enabled = await loadPlayoffEnabled();
+setPlayoffEnabled(enabled);
   };
 
   useEffect(() => {
@@ -73,6 +96,10 @@ export default function TabLayout() {
       const initial = await loadSeasonId();
       if (!mounted) return;
       currentSeasonRef.current = initial;
+            const enabled = await loadPlayoffEnabled();
+      if (!mounted) return;
+      setPlayoffEnabled(enabled);
+
 
       // 2) Start polling (reliable)
       intervalRef.current = setInterval(() => {
@@ -112,9 +139,13 @@ export default function TabLayout() {
           headerShown: false,
           tabBarButton: HapticTab,
           tabBarStyle: {
-            backgroundColor: Colors[scheme].background,
-            borderTopColor: "#ddd",
-          },
+  backgroundColor: Colors[scheme].background,
+  borderTopColor: "#ddd",
+},
+tabBarItemStyle: {
+  flex: 1,
+},
+
           tabBarActiveTintColor: Colors[scheme].tint,
           tabBarInactiveTintColor: Colors[scheme].text,
           tabBarShowLabel: true,
@@ -159,6 +190,37 @@ export default function TabLayout() {
             ),
           }}
         />
+
+<Tabs.Screen
+  name="playoffs"
+  options={{
+    title: "🏆 PLAYOFFS",
+    href: playoffEnabled ? undefined : null,
+    tabBarIcon: () => (
+      <IconSymbol
+        size={32}
+        name="flag.checkered"
+        color="#D4AF37"
+      />
+    ),
+    tabBarLabelStyle: {
+      fontWeight: "900",
+      letterSpacing: 1.5,
+      fontSize: 13,
+    },
+    tabBarItemStyle: playoffEnabled
+      ? {
+          backgroundColor: "rgba(212,175,55,0.12)",
+          borderRadius: 10,
+          marginHorizontal: 4,
+        }
+      : { display: "none" },
+  }}
+/>
+
+
+
+
 
         <Tabs.Screen
           name="announcements"

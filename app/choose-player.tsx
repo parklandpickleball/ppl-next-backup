@@ -5,13 +5,16 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
+
 import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabaseClient";
 
 type PlayerOption = {
   name: string;
 };
+const WEB_LAST_PLAYER_KEY = "PPL_WEB_LAST_PLAYER_NAME_V1";
 
 export default function ChoosePlayerScreen() {
   const router = useRouter();
@@ -40,11 +43,11 @@ export default function ChoosePlayerScreen() {
           .select("team_id")
           .eq("user_id", userId)
           .eq("season_id", seasonId)
-          .single();
+          .maybeSingle()
 
         const teamId = profile?.team_id;
         if (!teamId) {
-          router.replace("choose-team" as any);
+          router.replace("/choose-team" as any);
           return;
         }
 
@@ -67,6 +70,25 @@ export default function ChoosePlayerScreen() {
         }
 
         setPlayers(opts);
+            // ✅ WEB ONLY: skip only if THIS SEASON profile already has player_name
+if (Platform.OS === "web") {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from("user_season_profiles")
+      .select("player_name")
+      .eq("user_id", user.id)
+      .eq("season_id", seasonId)
+      .maybeSingle();
+
+    if (profile?.player_name) {
+      router.replace("/(tabs)/schedule" as any);
+      return;
+    }
+  }
+}
+
       } finally {
         setLoading(false);
       }
@@ -109,7 +131,13 @@ export default function ChoosePlayerScreen() {
         return;
       }
 
-      router.replace("(tabs)/schedule" as any);
+            // ✅ WEB ONLY: remember last selected player
+      if (Platform.OS === "web") {
+        window?.localStorage?.setItem(WEB_LAST_PLAYER_KEY, selectedPlayer);
+      }
+
+      router.replace("/(tabs)/schedule" as any);
+
     } finally {
       setSaving(false);
     }

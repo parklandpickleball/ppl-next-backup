@@ -35,6 +35,7 @@ export default function ScheduleBuilderAttendance() {
 
   const seasonId = String(params.seasonId ?? "") || FALLBACK_SEASON_ID;
   const week = Number(String(params.week ?? "0"));
+  console.log("ATTENDANCE SCREEN seasonId/week:", seasonId, week);
 
   const [loading, setLoading] = useState(false);
 
@@ -227,9 +228,20 @@ const groupedTeams = useMemo(() => {
       <View style={styles.headerRow}>
         <Text style={styles.title}>Attendance</Text>
 
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>Back</Text>
-        </Pressable>
+        <Pressable
+  style={styles.backBtn}
+  onPress={() => {
+    // ✅ Web: force navigation (works even after refresh / no history)
+    if (typeof window !== "undefined") {
+      window.location.href = `/schedule-builder?seasonId=${seasonId}&week=${week}`;
+      return;
+    }
+    // ✅ Native: normal navigation
+    router.replace(`/schedule-builder?seasonId=${seasonId}&week=${week}` as any);
+  }}
+>
+  <Text style={styles.backBtnText}>Back</Text>
+</Pressable>
       </View>
 
       <Text style={styles.sub}>

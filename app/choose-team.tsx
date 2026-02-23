@@ -8,6 +8,7 @@ import {
   ScrollView,
   Modal,
   TextInput,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabaseClient";
@@ -16,6 +17,8 @@ type TeamRow = {
   id: string;
   team_name: string;
 };
+const WEB_LAST_TEAM_KEY = "PPL_WEB_LAST_TEAM_ID_V1";
+
 
 export default function ChooseTeamScreen() {
   const router = useRouter();
@@ -55,7 +58,31 @@ export default function ChooseTeamScreen() {
           return;
         }
 
-        setTeams(teamRows);
+setTeams(teamRows);
+
+// ✅ WEB ONLY: skip only if season profile already has team_id
+if (Platform.OS === "web") {
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user && settings?.current_season_id) {
+    const { data: profile } = await supabase
+      .from("user_season_profiles")
+      .select("team_id")
+      .eq("user_id", user.id)
+      .eq("season_id", settings.current_season_id)
+      .maybeSingle();
+
+    if (profile?.team_id) {
+      router.replace("/choose-player" as any);
+      return;
+    }
+  }
+}
+
+
+
+
+
       } finally {
         setLoading(false);
       }
@@ -97,7 +124,13 @@ export default function ChooseTeamScreen() {
         return;
       }
 
-      router.replace("choose-player" as any);
+            // ✅ WEB ONLY: remember their last selected team for next time
+      if (Platform.OS === "web") {
+        window?.localStorage?.setItem(WEB_LAST_TEAM_KEY, teamId);
+      }
+
+      router.replace("/choose-player" as any);
+
     } finally {
       setSaving(false);
     }

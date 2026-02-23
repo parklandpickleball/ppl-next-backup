@@ -12,7 +12,7 @@ import {
   Platform,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../constants/supabaseClient";
 
 const DIVISION_ORDER: Record<string, number> = {
@@ -141,6 +141,14 @@ const TIMES = (() => {
 })();
 
 const COURTS = Array.from({ length: 15 }, (_, i) => i + 1);
+function getNextAvailableCourt(current: number, booked: Set<number>, maxCourt: number) {
+  for (let offset = 1; offset <= maxCourt; offset++) {
+    const candidate = ((current - 1 + offset) % maxCourt) + 1; // wraps 1..maxCourt
+    if (!booked.has(candidate)) return candidate;
+  }
+  // if all courts are booked, just keep current
+  return current;
+}
 
 function formatDateLong(d: Date) {
   try {
@@ -199,8 +207,20 @@ function showAlert(title: string, message: string) {
 
 export default function ScheduleBuilder() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   const [seasonId, setSeasonId] = useState<string>(FALLBACK_SEASON_ID);
+  // ✅ If we came from a deep link (like Attendance "Back"), respect seasonId/week in URL
+useEffect(() => {
+  const sid = String((params as any)?.seasonId ?? "").trim();
+  if (sid) setSeasonId(sid);
+}, [(params as any)?.seasonId]);
+
+const urlWeekNum = useMemo(() => {
+  const wRaw = String((params as any)?.week ?? "").trim();
+  const w = Number(wRaw);
+  return Number.isFinite(w) && w > 0 ? w : null;
+}, [(params as any)?.week]);
 
   const [seasonLabel, setSeasonLabel] = useState<string>("");
 
@@ -309,6 +329,14 @@ export default function ScheduleBuilder() {
         .filter((w) => Number.isFinite(w.weekNumber) && w.weekNumber > 0);
 
       setWeeks(mapped);
+      // ✅ If URL includes a week (ex: ?week=8), it overrides saved/default behavior
+if (urlWeekNum && mapped.length > 0) {
+  const foundFromUrl = mapped.find((x) => x.weekNumber === urlWeekNum) ?? null;
+  if (foundFromUrl) {
+    setSelectedWeek(foundFromUrl);
+    return;
+  }
+}
 
       // ✅ WEB: restore last selected week after refresh
       const saved = getSavedWeekNumber();
@@ -844,19 +872,26 @@ export default function ScheduleBuilder() {
       setEditingOriginalTeamAId(null);
       setEditingOriginalTeamBId(null);
     } else {
-      const ins = await supabase.from("matches").insert(payload);
-      if (ins.error) {
-        setDebugMsg("SAVE FAILED: " + ins.error.message);
-        return;
-      }
-    }
+  const ins = await supabase.from("matches").insert(payload);
+  if (ins.error) {
+    setDebugMsg("SAVE FAILED: " + ins.error.message);
+    return;
+  }
 
-    await loadMatches(seasonId, selectedWeek.weekNumber);
-    await loadSeasonMatchesForBadges(seasonId);
+  // ✅ After saving a NEW match, auto-advance to the next available court at this time
+  const bookedNext = new Set(bookedCourtsForTime);
+  bookedNext.add(selectedCourt); // include the court we just booked
+  const maxCourt = COURTS.length; // 15
+  const nextCourt = getNextAvailableCourt(selectedCourt, bookedNext, maxCourt);
+  setSelectedCourt(nextCourt);
+}
 
-    setTeamAId(null);
-    setTeamBId(null);
-    setTeamBTooltipData(null);
+await loadMatches(seasonId, selectedWeek.weekNumber);
+await loadSeasonMatchesForBadges(seasonId);
+
+setTeamAId(null);
+setTeamBId(null);
+setTeamBTooltipData(null);
   };
 
   const deleteMatch = async (id: string) => {
@@ -1067,9 +1102,13 @@ export default function ScheduleBuilder() {
             marginBottom: 12,
           }}
           onPress={() => {
-            router.back();
-            // adjust this path if your admin page route is different
-          }}
+  if (router.canGoBack?.()) {
+    router.back();
+    return;
+  }
+
+  router.replace("/admin");
+}}
         >
           <Text style={{ color: "#fff", fontWeight: "900" }}>Return to Admin</Text>
         </Pressable>
@@ -1340,12 +1379,25 @@ export default function ScheduleBuilder() {
                 key={t}
                 style={[styles.timeItem, t === selectedTime && styles.timeItemSelected]}
                 onPress={() => {
-                  setSelectedTime(t);
-                  setTimePanelOpen(false);
-                  setTeamAId(null);
-                  setTeamBId(null);
-                  setTeamBTooltipData(null);
-                }}
+  setSelectedTime(t);
+
+  // ✅ Default to FIRST available court for the newly selected time
+  const timeMins = parseTimeToMinutes(t) ?? -1;
+  const booked = new Set<number>();
+  for (const m of matches) {
+    const mm = parseTimeToMinutes(m.match_time);
+    if (mm != null && mm === timeMins) {
+      booked.add(Number(m.court));
+    }
+  }
+  const firstAvailable = COURTS.find((c) => !booked.has(c)) ?? 1;
+  setSelectedCourt(firstAvailable);
+
+  setTimePanelOpen(false);
+  setTeamAId(null);
+  setTeamBId(null);
+  setTeamBTooltipData(null);
+}}
               >
                 <Text style={[styles.timeItemText, t === selectedTime && styles.timeItemTextSelected]}>{t}</Text>
               </Pressable>

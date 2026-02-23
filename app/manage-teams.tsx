@@ -15,7 +15,7 @@ import { supabase } from "../constants/supabaseClient";
 import { useRouter } from "expo-router";
 
 type AppSettingsRow = { current_season_id: string | null };
-type SeasonRow = { id: string; name: string | null };
+type SeasonRow = { id: string; name: string | null; created_at?: string | null };
 
 type Division = { id: string; name: string };
 
@@ -32,6 +32,15 @@ type Team = {
 
 type PaymentStatus = "Not Paid" | "Partially Paid" | "Paid in full";
 
+type ImportTeamRow = {
+  id: string;
+  division: string; // division id from previous season
+  team_name: string;
+  player1_name: string;
+  player2_name: string;
+  is_active: boolean;
+};
+
 function normalizeName(s: string): string {
   return s.trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -47,6 +56,14 @@ function getTeamNameColor(status: PaymentStatus): string {
   if (status === "Paid in full") return "#16A34A"; // green
   if (status === "Partially Paid") return "#CA8A04"; // yellow
   return "#DC2626"; // red
+}
+
+function extractSeasonNumber(name: string | null | undefined): number | null {
+  const s = String(name ?? "");
+  const m = s.match(/(\d+)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return Number.isFinite(n) ? n : null;
 }
 
 export default function ManageTeamsScreen() {
@@ -87,6 +104,16 @@ export default function ManageTeamsScreen() {
   const [activeTarget, setActiveTarget] = useState<Team | null>(null);
   const [activeError, setActiveError] = useState<string | null>(null);
 
+  // ✅ IMPORT MODAL STATE (new)
+  const [importModalOpen, setImportModalOpen] = useState<boolean>(false);
+  const [importLoading, setImportLoading] = useState<boolean>(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [prevSeasonId, setPrevSeasonId] = useState<string | null>(null);
+  const [prevSeasonName, setPrevSeasonName] = useState<string>("");
+  const [prevTeams, setPrevTeams] = useState<ImportTeamRow[]>([]);
+  const [importedIds, setImportedIds] = useState<Set<string>>(new Set());
+  const [prevDivIdToName, setPrevDivIdToName] = useState<Record<string, string>>({});
+
   const loadSeason = useCallback(async () => {
     setErrorMsg("");
 
@@ -115,36 +142,33 @@ export default function ManageTeamsScreen() {
     return sid;
   }, []);
 
-  const loadDivisions = useCallback(
-    async (sid: string) => {
-      const { data, error } = await supabase.from("divisions").select("id,name").eq("season_id", sid);
+  const loadDivisions = useCallback(async (sid: string) => {
+    const { data, error } = await supabase.from("divisions").select("id,name").eq("season_id", sid);
 
-      if (error) {
-        console.error(error);
-        return [];
-      }
+    if (error) {
+      console.error(error);
+      return [];
+    }
 
-      const DIVISION_ORDER: Record<string, number> = {
-        Beginner: 0,
-        Intermediate: 1,
-        Advanced: 2,
-      };
+    const DIVISION_ORDER: Record<string, number> = {
+      Beginner: 0,
+      Intermediate: 1,
+      Advanced: 2,
+    };
 
-      const sorted = (data ?? []).slice().sort((a: any, b: any) => {
-        const aName = String(a.name ?? "").trim();
-        const bName = String(b.name ?? "").trim();
+    const sorted = (data ?? []).slice().sort((a: any, b: any) => {
+      const aName = String(a.name ?? "").trim();
+      const bName = String(b.name ?? "").trim();
 
-        const aRank = DIVISION_ORDER[aName] ?? 999;
-        const bRank = DIVISION_ORDER[bName] ?? 999;
+      const aRank = DIVISION_ORDER[aName] ?? 999;
+      const bRank = DIVISION_ORDER[bName] ?? 999;
 
-        if (aRank !== bRank) return aRank - bRank;
-        return aName.localeCompare(bName);
-      });
+      if (aRank !== bRank) return aRank - bRank;
+      return aName.localeCompare(bName);
+    });
 
-      return (sorted ?? []) as Division[];
-    },
-    []
-  );
+    return (sorted ?? []) as Division[];
+  }, []);
 
   const loadTeams = useCallback(async (sid: string) => {
     const { data, error } = await supabase
@@ -224,7 +248,9 @@ export default function ManageTeamsScreen() {
     }
 
     const normalizedIncoming = normalizeName(raw);
-    const dup = teams.some((t) => t.division === newTeamDivisionId && normalizeName(t.team_name) === normalizedIncoming);
+    const dup = teams.some(
+      (t) => t.division === newTeamDivisionId && normalizeName(t.team_name) === normalizedIncoming
+    );
     if (dup) {
       setPayError("Duplicate team name in this division.");
       return;
@@ -440,6 +466,190 @@ export default function ManageTeamsScreen() {
     }
   }, [activeTarget, closeActiveModal]);
 
+  // =========================
+  // ✅ IMPORT FLOW (new)
+  // =========================
+  const resolvePreviousSeasonByNameNumber = useCallback(async (currentSeasonId: string) => {
+    // Make sure we have the current season name
+    let currentName = seasonName;
+
+    if (!currentName) {
+      const { data, error } = await supabase.from("seasons").select("id,name").eq("id", currentSeasonId).single<SeasonRow>();
+      if (error) return null;
+      currentName = data?.name ?? "";
+    }
+
+    const curNum = extractSeasonNumber(currentName);
+    if (!curNum || curNum <= 1) return null;
+
+    const prevNameExact = `Season ${curNum - 1}`;
+
+    // Try exact match first (your naming is "Season X")
+    const { data: exact, error: exactErr } = await supabase
+      .from("seasons")
+      .select("id,name")
+      .eq("name", prevNameExact)
+      .maybeSingle<SeasonRow>();
+
+    if (!exactErr && exact?.id) return { id: exact.id, name: exact.name ?? prevNameExact };
+
+    // Fallback: scan all seasons and match number
+    const { data: all, error: allErr } = await supabase.from("seasons").select("id,name");
+    if (allErr || !all?.length) return null;
+
+    const match = (all as any[]).find((s) => extractSeasonNumber(s?.name) === curNum - 1);
+    if (!match?.id) return null;
+
+    return { id: String(match.id), name: String(match.name ?? prevNameExact) };
+  }, [seasonName]);
+
+  const openImportModal = useCallback(async () => {
+    if (!seasonId) return;
+
+    setImportModalOpen(true);
+    setImportError(null);
+    setPrevTeams([]);
+    setPrevSeasonId(null);
+    setPrevSeasonName("");
+    setImportedIds(new Set());
+    setPrevDivIdToName({});
+
+    setImportLoading(true);
+    try {
+      const prev = await resolvePreviousSeasonByNameNumber(seasonId);
+      if (!prev) {
+        setImportError("Could not find the previous season (needs Season number in name).");
+        return;
+      }
+
+      setPrevSeasonId(prev.id);
+      setPrevSeasonName(prev.name ?? "");
+
+      // Load previous season divisions so we can map division name -> new season division id
+      const { data: prevDivs, error: prevDivErr } = await supabase
+        .from("divisions")
+        .select("id,name")
+        .eq("season_id", prev.id);
+
+      if (prevDivErr) {
+        setImportError(prevDivErr.message);
+        return;
+      }
+
+      const divMap: Record<string, string> = {};
+      for (const d of (prevDivs ?? []) as any[]) {
+        divMap[String(d.id)] = String(d.name ?? "");
+      }
+      setPrevDivIdToName(divMap);
+
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id,division,team_name,player1_name,player2_name,is_active")
+        .eq("season_id", prev.id)
+        .order("team_name");
+
+      if (error) {
+        setImportError(error.message);
+        return;
+      }
+
+      const safePrev = ((data ?? []) as any[]).map((t) => ({
+        id: String(t.id),
+        division: String(t.division),
+        team_name: String(t.team_name ?? ""),
+        player1_name: String(t.player1_name ?? ""),
+        player2_name: String(t.player2_name ?? ""),
+        is_active: typeof t.is_active === "boolean" ? t.is_active : true,
+      })) as ImportTeamRow[];
+
+      setPrevTeams(safePrev);
+    } finally {
+      setImportLoading(false);
+    }
+  }, [resolvePreviousSeasonByNameNumber, seasonId]);
+
+  const closeImportModal = useCallback(() => {
+    setImportModalOpen(false);
+    setImportError(null);
+    setPrevTeams([]);
+    setPrevSeasonId(null);
+    setPrevSeasonName("");
+    setImportedIds(new Set());
+    setPrevDivIdToName({});
+  }, []);
+
+  const importOneTeam = useCallback(
+    async (src: ImportTeamRow) => {
+      if (!seasonId) return;
+
+      // Build current division name -> id map
+      const currentNameToId: Record<string, string> = {};
+      for (const d of divisions) currentNameToId[String(d.name ?? "").trim()] = d.id;
+
+      const prevDivName = String(prevDivIdToName[src.division] ?? "").trim();
+      const mappedDivisionId = prevDivName ? currentNameToId[prevDivName] ?? null : null;
+
+      // target division:
+      // 1) match by division name (best)
+      // 2) fallback to selected division button
+      const targetDivisionId = mappedDivisionId || newTeamDivisionId;
+
+      if (!targetDivisionId) {
+        setImportError("No matching division found. Select a division above, then import again.");
+        return;
+      }
+
+      // prevent duplicates in that target division
+      const normalizedIncoming = normalizeName(src.team_name);
+      const dup = teams.some((t) => t.division === targetDivisionId && normalizeName(t.team_name) === normalizedIncoming);
+      if (dup) {
+        setImportError("That team already exists in the target division.");
+        return;
+      }
+
+      setImportError(null);
+      setBusy(true);
+      try {
+        const { data: inserted, error } = await supabase
+          .from("teams")
+          .insert({
+            season_id: seasonId,
+            division: targetDivisionId,
+            team_name: src.team_name,
+            player1_name: src.player1_name,
+            player2_name: src.player2_name,
+            // ✅ payments reset for new season
+            player1_paid: false,
+            player2_paid: false,
+            is_active: true,
+          })
+          .select("id,division,team_name,player1_name,player2_name,player1_paid,player2_paid,is_active")
+          .single();
+
+        if (error || !inserted) {
+          setImportError(error?.message ?? "Import failed.");
+          return;
+        }
+
+        const safeInserted = {
+          ...(inserted as any),
+          is_active: typeof (inserted as any).is_active === "boolean" ? (inserted as any).is_active : true,
+        } as Team;
+
+        setTeams((prev) => [...prev, safeInserted]);
+
+        setImportedIds((prevSet) => {
+          const next = new Set(prevSet);
+          next.add(src.id);
+          return next;
+        });
+      } finally {
+        setBusy(false);
+      }
+    },
+    [divisions, newTeamDivisionId, prevDivIdToName, seasonId, teams]
+  );
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -467,7 +677,6 @@ export default function ManageTeamsScreen() {
             marginBottom: 16,
           }}
           onPress={() => {
-            // ✅ go back to the already-signed-in admin page (not the login screen)
             router.back();
           }}
         >
@@ -477,16 +686,34 @@ export default function ManageTeamsScreen() {
         <View style={styles.headerRow}>
           <View style={{ gap: 4 }}>
             <Text style={styles.title}>Manage Teams</Text>
-            <Text style={styles.seasonLine}>{seasonName ? `Season: ${seasonName}` : seasonId ? `Season: ${seasonId}` : "Season"}</Text>
+            <Text style={styles.seasonLine}>
+              {seasonName ? `Season: ${seasonName}` : seasonId ? `Season: ${seasonId}` : "Season"}
+            </Text>
           </View>
 
-          <Pressable
-            onPress={() => void refreshAll()}
-            style={({ pressed }) => [styles.refreshBtn, pressed && styles.pressed]}
-            hitSlop={10}
-          >
-            <Text style={styles.refreshBtnText}>Refresh</Text>
-          </Pressable>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            {/* ✅ IMPORT BUTTON (new) */}
+            <Pressable
+              onPress={() => void openImportModal()}
+              style={({ pressed }) => [
+                styles.importBtn,
+                (!seasonId || busy || loading) && styles.disabled,
+                pressed && !busy && styles.pressed,
+              ]}
+              disabled={!seasonId || busy || loading}
+              hitSlop={10}
+            >
+              <Text style={styles.importBtnText}>Import</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => void refreshAll()}
+              style={({ pressed }) => [styles.refreshBtn, pressed && styles.pressed]}
+              hitSlop={10}
+            >
+              <Text style={styles.refreshBtnText}>Refresh</Text>
+            </Pressable>
+          </View>
         </View>
 
         {errorMsg ? (
@@ -657,6 +884,82 @@ export default function ManageTeamsScreen() {
           })
         )}
       </ScrollView>
+
+      {/* ✅ IMPORT MODAL (new) */}
+      <Modal visible={importModalOpen} transparent animationType="fade" onRequestClose={closeImportModal}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Import Teams</Text>
+
+            <Text style={styles.modalSub}>
+              From:{" "}
+              <Text style={styles.modalStrong}>
+                {importLoading ? "Loading…" : prevSeasonName ? prevSeasonName : prevSeasonId ? prevSeasonId : "Previous Season"}
+              </Text>
+            </Text>
+
+            {importError ? <Text style={styles.modalError}>{importError}</Text> : null}
+
+            <View style={[styles.divList, { marginTop: 12 }]}>
+              {importLoading ? (
+                <View style={{ paddingVertical: 18, alignItems: "center", gap: 10 }}>
+                  <ActivityIndicator />
+                  <Text style={{ fontWeight: "800", color: "#111827" }}>Loading teams…</Text>
+                </View>
+              ) : prevTeams.length === 0 ? (
+                <View style={{ paddingVertical: 18 }}>
+                  <Text style={{ fontWeight: "900", color: "#111827", textAlign: "center" }}>
+                    No teams found in the previous season.
+                  </Text>
+                </View>
+              ) : (
+                <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={true}>
+                  {prevTeams.map((t) => {
+                    const alreadyImported = importedIds.has(t.id);
+                    const prevDivName = String(prevDivIdToName[t.division] ?? "").trim();
+
+                    return (
+                      <View key={t.id} style={styles.importRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.importTeamText}>{t.team_name}</Text>
+                          <Text style={styles.importPlayersText}>
+                            {t.player1_name} / {t.player2_name}
+                          </Text>
+                          {prevDivName ? (
+                            <Text style={styles.importDivisionText}>Prev division: {prevDivName}</Text>
+                          ) : null}
+                          {!t.is_active ? <Text style={styles.importInactiveText}>INACTIVE (last season)</Text> : null}
+                        </View>
+
+                        <Pressable
+                          onPress={() => void importOneTeam(t)}
+                          disabled={busy || alreadyImported}
+                          style={({ pressed }) => [
+                            styles.importOneBtn,
+                            (busy || alreadyImported) && styles.disabled,
+                            pressed && !busy && styles.pressed,
+                          ]}
+                          hitSlop={10}
+                        >
+                          <Text style={styles.importOneBtnText}>
+                            {alreadyImported ? "Imported" : busy ? "…" : "Import"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              )}
+            </View>
+
+            <View style={styles.modalRow}>
+              <Pressable style={({ pressed }) => [styles.modalCancel, pressed && styles.pressed]} onPress={closeImportModal}>
+                <Text style={styles.modalCancelText}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* PAYMENT MODAL */}
       <Modal visible={payModalOpen} transparent animationType="fade" onRequestClose={closePayModal}>
@@ -837,6 +1140,10 @@ const styles = StyleSheet.create({
 
   refreshBtn: { backgroundColor: "#111827", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
   refreshBtnText: { color: "#fff", fontWeight: "900" },
+
+  // ✅ import button styles (new)
+  importBtn: { backgroundColor: "#1D4ED8", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
+  importBtnText: { color: "#fff", fontWeight: "900" },
 
   errBox: {
     padding: 12,
@@ -1026,4 +1333,35 @@ const styles = StyleSheet.create({
 
   modalDelete: { flex: 1, backgroundColor: "#7F1D1D", borderRadius: 14, paddingVertical: 12, alignItems: "center" },
   modalDeleteText: { color: "#fff", fontWeight: "900", fontSize: 16 },
+
+  // ✅ import list row styles (new)
+  importRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 8,
+    backgroundColor: "#FFFFFF",
+  },
+  importTeamText: { fontWeight: "900", color: "#111827" },
+  importPlayersText: { marginTop: 2, fontWeight: "800", color: "#374151" },
+  importDivisionText: { marginTop: 4, fontWeight: "900", color: "#111827" },
+  importInactiveText: { marginTop: 4, fontWeight: "900", color: "#991B1B" },
+  importOneBtn: {
+    backgroundColor: "#16A34A",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    ...(Platform.OS === "web"
+      ? ({
+          cursor: "pointer",
+          userSelect: "none",
+        } as unknown as object)
+      : null),
+  },
+  importOneBtnText: { color: "#fff", fontWeight: "900" },
 });
