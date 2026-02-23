@@ -62,8 +62,10 @@ export default function PublicAttendancePage() {
   const [divisions, setDivisions] = useState<any[]>([]);
 
   const [search, setSearch] = useState("");
-    const [selected, setSelected] = useState<PlayerPick | null>(null);
-      const [attendanceMap, setAttendanceMap] = useState<Record<string, "IN" | "OUT">>({});
+  const [selected, setSelected] = useState<PlayerPick | null>(null);
+
+  // ✅ persisted status per player (teamId-playerWhich)
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, "IN" | "OUT">>({});
 
   const [lastSaved, setLastSaved] = useState<{
     week: number;
@@ -75,7 +77,10 @@ export default function PublicAttendancePage() {
   useEffect(() => {
     const loadSeason = async () => {
       // Single source of truth: app_settings.current_season_id
-      const res = await supabase.from("app_settings").select("current_season_id").maybeSingle<AppSettingsRow>();
+      const res = await supabase
+        .from("app_settings")
+        .select("current_season_id")
+        .maybeSingle<AppSettingsRow>();
       const sid = res.data?.current_season_id ?? null;
       setSeasonId(sid || FALLBACK_SEASON_ID);
     };
@@ -98,7 +103,12 @@ export default function PublicAttendancePage() {
         setLoading(false);
       }
     };
-      useEffect(() => {
+
+    load();
+  }, [seasonId]);
+
+  // ✅ THIS must be its own top-level hook (NOT nested)
+  useEffect(() => {
     const loadAttendance = async () => {
       if (!seasonId || !week) return;
 
@@ -112,11 +122,11 @@ export default function PublicAttendancePage() {
 
       const map: Record<string, "IN" | "OUT"> = {};
 
-      for (const row of data) {
-        if (row.player1_in !== null) {
+      for (const row of data as any[]) {
+        if (row.player1_in !== null && row.player1_in !== undefined) {
           map[`${row.team_id}-1`] = row.player1_in ? "IN" : "OUT";
         }
-        if (row.player2_in !== null) {
+        if (row.player2_in !== null && row.player2_in !== undefined) {
           map[`${row.team_id}-2`] = row.player2_in ? "IN" : "OUT";
         }
       }
@@ -126,9 +136,6 @@ export default function PublicAttendancePage() {
 
     loadAttendance();
   }, [seasonId, week]);
-
-    load();
-  }, [seasonId]);
 
   const players: PlayerPick[] = useMemo(() => {
     const out: PlayerPick[] = [];
@@ -235,16 +242,18 @@ export default function PublicAttendancePage() {
         return;
       }
 
-            setLastSaved({
+      setLastSaved({
         week,
         teamId: selected.teamId,
         playerWhich: selected.playerWhich,
         status: inOrOut,
       });
-setAttendanceMap((prev) => ({
-  ...prev,
-  [`${selected.teamId}-${selected.playerWhich}`]: inOrOut,
-}));
+
+      setAttendanceMap((prev) => ({
+        ...prev,
+        [`${selected.teamId}-${selected.playerWhich}`]: inOrOut,
+      }));
+
       Alert.alert("Saved", `${selected.playerName} marked ${inOrOut} for Week ${week}.`);
     } finally {
       setSaving(false);
@@ -257,7 +266,7 @@ setAttendanceMap((prev) => ({
         <Text style={styles.title}>PPL Attendance</Text>
         <Text style={styles.sub}>Pick your name, then tap IN or OUT.</Text>
         <Text style={{ marginTop: 6, fontWeight: "800", color: "#444" }}>Season: {seasonId}</Text>
-<Text style={{ marginTop: 2, fontWeight: "800", color: "#444" }}>Teams loaded: {teams.length}</Text>
+        <Text style={{ marginTop: 2, fontWeight: "800", color: "#444" }}>Teams loaded: {teams.length}</Text>
       </View>
 
       <View style={styles.weekBox}>
@@ -292,7 +301,7 @@ setAttendanceMap((prev) => ({
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-                    {filteredPlayers.map((p) => {
+          {filteredPlayers.map((p) => {
             const isSel =
               selected?.teamId === p.teamId &&
               selected?.playerWhich === p.playerWhich &&
@@ -305,11 +314,11 @@ setAttendanceMap((prev) => ({
                 key={`${p.teamId}-${p.playerWhich}-${p.playerName}`}
                 onPress={() => setSelected(p)}
                 style={[
-  styles.pickRow,
-  status === "IN" && styles.pickRowSelectedIn,
-  status === "OUT" && styles.pickRowSelectedOut,
-  isSel && !status && styles.pickRowSelected,
-]}
+                  styles.pickRow,
+                  status === "IN" && styles.pickRowSelectedIn,
+                  status === "OUT" && styles.pickRowSelectedOut,
+                  isSel && !status && styles.pickRowSelected,
+                ]}
               >
                 <View style={{ flex: 1 }}>
                   <Text style={styles.pickName}>{p.playerName}</Text>
@@ -318,16 +327,14 @@ setAttendanceMap((prev) => ({
                   </Text>
                 </View>
                 <Text style={styles.pickRight}>
-  {status === "IN" ? "IN" : status === "OUT" ? "OUT" : isSel ? "✓" : ""}
-</Text>
+                  {status === "IN" ? "IN" : status === "OUT" ? "OUT" : isSel ? "✓" : ""}
+                </Text>
               </Pressable>
             );
           })}
 
           {filteredPlayers.length === 0 && (
-            <Text style={{ fontWeight: "800", color: "#666" }}>
-              No matches. Try a different search.
-            </Text>
+            <Text style={{ fontWeight: "800", color: "#666" }}>No matches. Try a different search.</Text>
           )}
         </ScrollView>
       )}
@@ -410,7 +417,7 @@ const styles = StyleSheet.create({
     borderColor: "#111",
     backgroundColor: "#FEF3C7",
   },
-    pickRowSelectedIn: {
+  pickRowSelectedIn: {
     borderColor: "#16a34a",
     backgroundColor: "#DCFCE7",
   },
@@ -420,7 +427,7 @@ const styles = StyleSheet.create({
   },
   pickName: { fontWeight: "900", fontSize: 16, color: "#111" },
   pickMeta: { marginTop: 2, fontWeight: "800", color: "#555" },
-  pickRight: { width: 24, textAlign: "right", fontWeight: "900", fontSize: 18 },
+  pickRight: { width: 40, textAlign: "right", fontWeight: "900", fontSize: 14 },
 
   bottomBar: {
     position: "absolute",
