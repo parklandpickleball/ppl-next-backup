@@ -63,6 +63,7 @@ export default function PublicAttendancePage() {
 
   const [search, setSearch] = useState("");
     const [selected, setSelected] = useState<PlayerPick | null>(null);
+      const [attendanceMap, setAttendanceMap] = useState<Record<string, "IN" | "OUT">>({});
 
   const [lastSaved, setLastSaved] = useState<{
     week: number;
@@ -97,6 +98,34 @@ export default function PublicAttendancePage() {
         setLoading(false);
       }
     };
+      useEffect(() => {
+    const loadAttendance = async () => {
+      if (!seasonId || !week) return;
+
+      const { data } = await supabase
+        .from("attendance")
+        .select("*")
+        .eq("season_id", seasonId)
+        .eq("week", week);
+
+      if (!data) return;
+
+      const map: Record<string, "IN" | "OUT"> = {};
+
+      for (const row of data) {
+        if (row.player1_in !== null) {
+          map[`${row.team_id}-1`] = row.player1_in ? "IN" : "OUT";
+        }
+        if (row.player2_in !== null) {
+          map[`${row.team_id}-2`] = row.player2_in ? "IN" : "OUT";
+        }
+      }
+
+      setAttendanceMap(map);
+    };
+
+    loadAttendance();
+  }, [seasonId, week]);
 
     load();
   }, [seasonId]);
@@ -212,7 +241,10 @@ export default function PublicAttendancePage() {
         playerWhich: selected.playerWhich,
         status: inOrOut,
       });
-
+setAttendanceMap((prev) => ({
+  ...prev,
+  [`${selected.teamId}-${selected.playerWhich}`]: inOrOut,
+}));
       Alert.alert("Saved", `${selected.playerName} marked ${inOrOut} for Week ${week}.`);
     } finally {
       setSaving(false);
@@ -260,26 +292,24 @@ export default function PublicAttendancePage() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }}>
-          {filteredPlayers.map((p) => {
+                    {filteredPlayers.map((p) => {
             const isSel =
-              selected?.teamId === p.teamId && selected?.playerWhich === p.playerWhich && selected?.playerName === p.playerName;
+              selected?.teamId === p.teamId &&
+              selected?.playerWhich === p.playerWhich &&
+              selected?.playerName === p.playerName;
 
-                        const savedMatch =
-              isSel &&
-              lastSaved?.week === week &&
-              lastSaved?.teamId === p.teamId &&
-              lastSaved?.playerWhich === p.playerWhich;
+            const status = attendanceMap[`${p.teamId}-${p.playerWhich}`];
 
             return (
               <Pressable
                 key={`${p.teamId}-${p.playerWhich}-${p.playerName}`}
                 onPress={() => setSelected(p)}
                 style={[
-                  styles.pickRow,
-                  isSel && styles.pickRowSelected,
-                  savedMatch && lastSaved?.status === "IN" && styles.pickRowSelectedIn,
-                  savedMatch && lastSaved?.status === "OUT" && styles.pickRowSelectedOut,
-                ]}
+  styles.pickRow,
+  status === "IN" && styles.pickRowSelectedIn,
+  status === "OUT" && styles.pickRowSelectedOut,
+  isSel && !status && styles.pickRowSelected,
+]}
               >
                 <View style={{ flex: 1 }}>
                   <Text style={styles.pickName}>{p.playerName}</Text>
@@ -287,7 +317,9 @@ export default function PublicAttendancePage() {
                     {p.teamName} • Player {p.playerWhich}
                   </Text>
                 </View>
-                <Text style={styles.pickRight}>{isSel ? "✓" : ""}</Text>
+                <Text style={styles.pickRight}>
+  {status === "IN" ? "IN" : status === "OUT" ? "OUT" : isSel ? "✓" : ""}
+</Text>
               </Pressable>
             );
           })}
