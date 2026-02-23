@@ -54,6 +54,7 @@ export default function PublicAttendancePage() {
 
   const [weekInput, setWeekInput] = useState(initialWeek ? String(initialWeek) : "");
   const [week, setWeek] = useState<number>(initialWeek);
+  const weekLockedFromLink = useMemo(() => initialWeek > 0, [initialWeek]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -269,19 +270,28 @@ export default function PublicAttendancePage() {
         <Text style={{ marginTop: 2, fontWeight: "800", color: "#444" }}>Teams loaded: {teams.length}</Text>
       </View>
 
-      <View style={styles.weekBox}>
-        <Text style={styles.weekLabel}>Week</Text>
-        <TextInput
-          value={weekInput}
-          onChangeText={setWeekInput}
-          placeholder="e.g. 8"
-          keyboardType="numeric"
-          style={styles.weekInput}
-        />
-        <Pressable style={styles.weekBtn} onPress={applyWeek}>
-          <Text style={styles.weekBtnText}>Set</Text>
-        </Pressable>
-      </View>
+    {!weekLockedFromLink ? (
+  <View style={styles.weekBox}>
+    <Text style={styles.weekLabel}>Week</Text>
+    <TextInput
+      value={weekInput}
+      onChangeText={setWeekInput}
+      placeholder="e.g. 8"
+      keyboardType="numeric"
+      style={styles.weekInput}
+    />
+    <Pressable style={styles.weekBtn} onPress={applyWeek}>
+      <Text style={styles.weekBtnText}>Set</Text>
+    </Pressable>
+  </View>
+) : (
+  <View style={styles.weekBox}>
+    <Text style={styles.weekLabel}>Week</Text>
+    <View style={[styles.weekInput, { justifyContent: "center" }]}>
+      <Text style={{ fontWeight: "900" }}>{week}</Text>
+    </View>
+  </View>
+)}
 
       {!weekOk && <Text style={styles.warn}>⚠️ Week is required before submitting.</Text>}
 
