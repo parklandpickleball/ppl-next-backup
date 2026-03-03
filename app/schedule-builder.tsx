@@ -657,7 +657,7 @@ if (urlWeekNum && mapped.length > 0) {
     }
 
     return [...extras, ...activeOnly];
-  }, [teams, selectedDivisionId, editingMatchId, teamAId, teamBId]);
+  }, [teams, selectedDivisionId, editingMatchId]);
 
   const teamNameById = useMemo(() => {
     const m = new Map<string, string>();

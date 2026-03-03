@@ -45,6 +45,15 @@ function toN(s: string) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ✅ Ghost filter: teams named "Ghost/Ghost" NEVER appear in standings/seeds,
+// but games vs Ghost still count for the *real* team only.
+function isGhostTeamName(name: any) {
+  const raw = (name ?? "").toString().trim().toLowerCase();
+  if (!raw) return false;
+  const normalized = raw.replace(/\s+/g, "");
+  return normalized === "ghost/ghost";
+}
+
 type GameParse =
   | { kind: "W"; roundNum: number; matchIndex: number; matchStr: string }
   | { kind: "L"; roundNum: number; matchIndex: number; matchStr: string }
@@ -228,12 +237,19 @@ export default function PlayoffsTab() {
             console.log("teams load error:", teamErr.message);
             setTeams([]);
           } else {
-            const teamsInDiv = (teamRows ?? []) as Array<{
+            const teamsInDivAll = (teamRows ?? []) as Array<{
               id: string;
               team_name: string;
               is_active: boolean;
               division: string;
             }>;
+
+            const ghostIds = new Set<string>(
+              teamsInDivAll.filter((t) => isGhostTeamName(t.team_name)).map((t) => t.id)
+            );
+
+            // ✅ Remove Ghost/Ghost from standings/seeds list
+            const teamsInDiv = teamsInDivAll.filter((t) => !ghostIds.has(t.id));
 
             if (!teamsInDiv.length) {
               setTeams([]);
@@ -280,7 +296,15 @@ export default function PlayoffsTab() {
 
                 const stats: Record<
                   string,
-                  { id: string; team_name: string; gamesPlayed: number; wins: number; losses: number; pointsFor: number; pointsAgainst: number }
+                  {
+                    id: string;
+                    team_name: string;
+                    gamesPlayed: number;
+                    wins: number;
+                    losses: number;
+                    pointsFor: number;
+                    pointsAgainst: number;
+                  }
                 > = {};
 
                 for (const t of teamsInDiv) {
@@ -303,7 +327,12 @@ export default function PlayoffsTab() {
                   const aId = m.team_a_id;
                   const bId = m.team_b_id;
                   if (!aId || !bId) continue;
-                  if (!stats[aId] || !stats[bId]) continue;
+
+                  const aIsGhost = ghostIds.has(aId);
+                  const bIsGhost = ghostIds.has(bId);
+
+                  // both ghost: ignore entirely
+                  if (aIsGhost && bIsGhost) continue;
 
                   const a = asScoreFields(s.team_a);
                   const b = asScoreFields(s.team_b);
@@ -316,6 +345,30 @@ export default function PlayoffsTab() {
 
                     const ap = toN(aRaw[i]);
                     const bp = toN(bRaw[i]);
+
+                    // ✅ If Ghost is involved, only the real team gets stats
+                    if (!aIsGhost && bIsGhost) {
+                      if (!stats[aId]) continue;
+                      stats[aId].gamesPlayed += 1;
+                      stats[aId].pointsFor += ap;
+                      stats[aId].pointsAgainst += bp;
+                      if (ap > bp) stats[aId].wins += 1;
+                      else if (bp > ap) stats[aId].losses += 1;
+                      continue;
+                    }
+
+                    if (aIsGhost && !bIsGhost) {
+                      if (!stats[bId]) continue;
+                      stats[bId].gamesPlayed += 1;
+                      stats[bId].pointsFor += bp;
+                      stats[bId].pointsAgainst += ap;
+                      if (bp > ap) stats[bId].wins += 1;
+                      else if (ap > bp) stats[bId].losses += 1;
+                      continue;
+                    }
+
+                    // normal match: both real teams
+                    if (!stats[aId] || !stats[bId]) continue;
 
                     stats[aId].gamesPlayed += 1;
                     stats[bId].gamesPlayed += 1;
@@ -1541,53 +1594,51 @@ export default function PlayoffsTab() {
           </View>
         ) : (
           <View style={styles.boardArea}>
-      <Text style={styles.sectionTitle}>
-  {currentMode === "FREEFORM" ? "Freeform" : "Bracket"}
-</Text>
+            <Text style={styles.sectionTitle}>{currentMode === "FREEFORM" ? "Freeform" : "Bracket"}</Text>
 
-{currentMode === "FREEFORM" ? (
- <PlayoffFreeformBoard
-  isAdmin={isAdminUnlocked}
-  enabled={true}
-  seedsLocked={seedsLocked}
-  divisionId={selectedDivisionId}
-  divisionName={divisions.find((d) => d.id === selectedDivisionId)?.name ?? ""}
-  seasonId={seasonId}
-  seasonName={seasonName}
-  teams={displayTeams}
-  freeform={selectedBoard?.board_json?.freeform ?? null}
-  onSaveFreeform={async (nextFreeform) => {
-    if (!seasonId || !selectedDivisionId) return;
+            {currentMode === "FREEFORM" ? (
+              <PlayoffFreeformBoard
+                isAdmin={isAdminUnlocked}
+                enabled={true}
+                seedsLocked={seedsLocked}
+                divisionId={selectedDivisionId}
+                divisionName={divisions.find((d) => d.id === selectedDivisionId)?.name ?? ""}
+                seasonId={seasonId}
+                seasonName={seasonName}
+                teams={displayTeams}
+                freeform={selectedBoard?.board_json?.freeform ?? null}
+                onSaveFreeform={async (nextFreeform) => {
+                  if (!seasonId || !selectedDivisionId) return;
 
-    const existingJson = boardsByDivision[selectedDivisionId]?.board_json ?? {};
-    const nextBoardJson = { ...existingJson, freeform: nextFreeform };
+                  const existingJson = boardsByDivision[selectedDivisionId]?.board_json ?? {};
+                  const nextBoardJson = { ...existingJson, freeform: nextFreeform };
 
-    await supabase
-      .from("playoff_boards")
-      .update({ board_json: nextBoardJson })
-      .eq("season_id", seasonId)
-      .eq("division_id", selectedDivisionId);
+                  await supabase
+                    .from("playoff_boards")
+                    .update({ board_json: nextBoardJson })
+                    .eq("season_id", seasonId)
+                    .eq("division_id", selectedDivisionId);
 
-    setBoardsByDivision((prev) => ({
-      ...prev,
-      [selectedDivisionId]: {
-        division_id: selectedDivisionId,
-        board_json: nextBoardJson,
-        updated_at: new Date().toISOString(),
-      },
-    }));
-  }}
-/>
-) : (
-  <View style={styles.bracketBox}>
+                  setBoardsByDivision((prev) => ({
+                    ...prev,
+                    [selectedDivisionId]: {
+                      division_id: selectedDivisionId,
+                      board_json: nextBoardJson,
+                      updated_at: new Date().toISOString(),
+                    },
+                  }));
+                }}
+              />
+            ) : (
+              <View style={styles.bracketBox}>
                 <ScrollView
-  horizontal
-  contentContainerStyle={styles.bracketRow}
-  showsHorizontalScrollIndicator
-  nestedScrollEnabled
-  directionalLockEnabled
-  bounces={false}
->
+                  horizontal
+                  contentContainerStyle={styles.bracketRow}
+                  showsHorizontalScrollIndicator
+                  nestedScrollEnabled
+                  directionalLockEnabled
+                  bounces={false}
+                >
                   <View style={styles.seedColumn}>
                     <Text style={styles.columnTitle}>Seeds</Text>
 
@@ -1649,7 +1700,7 @@ export default function PlayoffsTab() {
           </View>
         )}
 
-          {divisionPickerOpen && (
+        {divisionPickerOpen && (
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>Select Division</Text>
@@ -1680,7 +1731,7 @@ export default function PlayoffsTab() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
-wrap: { padding: 16, paddingBottom: 40, flexGrow: 1 },
+  wrap: { padding: 16, paddingBottom: 40, flexGrow: 1 },
   title: { fontSize: 26, fontWeight: "900", marginBottom: 6 },
 
   adminModeOn: { color: "#16a34a", fontWeight: "900", marginBottom: 10 },

@@ -23,6 +23,9 @@ import { supabase } from "../../constants/supabaseClient";
  *
  * ✅ FIX (THIS CHANGE): Teams appear ONLY ONCE under their CURRENT division (from teams.division),
  * while keeping ALL verified results across the season no matter what division they played in earlier.
+ *
+ * ✅ NEW (GHOST): Teams flagged is_ghost=true NEVER appear in standings,
+ * and matches vs GHOST count ONLY for the real team (not for Ghost).
  */
 
 type AppSettingsRow = { current_season_id: string | null };
@@ -50,6 +53,7 @@ type TeamRow = {
   id: string;
   team_name: string | null;
   is_active: boolean | null;
+  is_ghost: boolean | null; // ✅ NEW
   division: string | null; // ✅ current division stored on teams (Manage Teams)
 };
 
@@ -118,6 +122,9 @@ export default function StandingsScreen() {
   const [teamNameById, setTeamNameById] = useState<Record<string, string>>({});
   const [teamActiveById, setTeamActiveById] = useState<Record<string, boolean>>({});
 
+  // ✅ NEW: store ghost flag (Ghost never appears in standings/seedings)
+  const [teamGhostById, setTeamGhostById] = useState<Record<string, boolean>>({});
+
   // ✅ store CURRENT team division (from Manage Teams)
   const [teamDivisionById, setTeamDivisionById] = useState<Record<string, string | null>>({});
 
@@ -167,6 +174,7 @@ export default function StandingsScreen() {
       setMatches([]);
       setTeamNameById({});
       setTeamActiveById({});
+      setTeamGhostById({});
       setTeamDivisionById({});
       setDivisionsById({});
       setErrorMsg("Could not load matches for this season.");
@@ -195,21 +203,24 @@ export default function StandingsScreen() {
     if (teamIds.length) {
       const { data: teamRows } = await supabase
         .from("teams")
-        .select("id,team_name,is_active,division")
+        .select("id,team_name,is_active,is_ghost,division")
         .in("id", teamIds);
 
       const nameMap: Record<string, string> = {};
       const activeMap: Record<string, boolean> = {};
+      const ghostMap: Record<string, boolean> = {};
       const divMap: Record<string, string | null> = {};
 
       (teamRows as TeamRow[] | null)?.forEach((t) => {
         nameMap[t.id] = (t.team_name ?? "Team").trim() || "Team";
         activeMap[t.id] = t.is_active !== false; // null/true => active, false => inactive
+        ghostMap[t.id] = t.is_ghost === true;
         divMap[t.id] = t.division ?? null;
       });
 
       setTeamNameById(nameMap);
       setTeamActiveById(activeMap);
+      setTeamGhostById(ghostMap);
       setTeamDivisionById(divMap);
 
       teamDivisionIds = Array.from(
@@ -222,6 +233,7 @@ export default function StandingsScreen() {
     } else {
       setTeamNameById({});
       setTeamActiveById({});
+      setTeamGhostById({});
       setTeamDivisionById({});
     }
 
@@ -285,6 +297,7 @@ export default function StandingsScreen() {
         setScoresByMatchId({});
         setTeamNameById({});
         setTeamActiveById({});
+        setTeamGhostById({});
         setTeamDivisionById({});
         setDivisionsById({});
         setLoading(false);
@@ -360,6 +373,9 @@ export default function StandingsScreen() {
     const totals = new Map<string, TeamTotals>();
 
     const ensureTeam = (teamId: string, fallbackName: string) => {
+      // ✅ Ghost never appears in standings
+      if (teamGhostById[teamId]) return;
+
       const name = (teamNameById[teamId] ?? fallbackName ?? "Team").trim() || "Team";
       const isActive = teamActiveById[teamId] ?? true;
 
@@ -380,7 +396,7 @@ export default function StandingsScreen() {
       }
     };
 
-    // include teams even if 0 games
+    // include teams even if 0 games (Ghost is excluded here by ensureTeam)
     for (const m of matches) {
       if (m.team_a_id) ensureTeam(m.team_a_id, "Team A");
       if (m.team_b_id) ensureTeam(m.team_b_id, "Team B");
@@ -399,11 +415,19 @@ export default function StandingsScreen() {
       const aRaw = [a.g1, a.g2, a.g3];
       const bRaw = [b.g1, b.g2, b.g3];
 
+      const aIsGhost = !!teamGhostById[m.team_a_id];
+      const bIsGhost = !!teamGhostById[m.team_b_id];
+
+      // Ensure only NON-ghost teams exist in totals
       ensureTeam(m.team_a_id, "Team A");
       ensureTeam(m.team_b_id, "Team B");
 
-      const ta = totals.get(m.team_a_id)!;
-      const tb = totals.get(m.team_b_id)!;
+      // If both are ghost (should never happen), skip
+      if (aIsGhost && bIsGhost) continue;
+
+      // Pull totals safely (ghost teams will be undefined because ensureTeam returned)
+      const ta = aIsGhost ? null : totals.get(m.team_a_id)!;
+      const tb = bIsGhost ? null : totals.get(m.team_b_id)!;
 
       for (let i = 0; i < 3; i++) {
         if (!gameEnteredPair(aRaw[i], bRaw[i])) continue;
@@ -411,26 +435,28 @@ export default function StandingsScreen() {
         const ap = toN(aRaw[i]);
         const bp = toN(bRaw[i]);
 
-        ta.gamesPlayed += 1;
-        tb.gamesPlayed += 1;
+        // ✅ If one side is ghost, count ONLY for the real team
+        if (!aIsGhost && ta) {
+          ta.gamesPlayed += 1;
+          ta.pointsFor += ap;
+          ta.pointsAgainst += bp;
 
-        ta.pointsFor += ap;
-        ta.pointsAgainst += bp;
+          if (ap > bp) ta.wins += 1;
+          else if (bp > ap) ta.losses += 1;
+        }
 
-        tb.pointsFor += bp;
-        tb.pointsAgainst += ap;
+        if (!bIsGhost && tb) {
+          tb.gamesPlayed += 1;
+          tb.pointsFor += bp;
+          tb.pointsAgainst += ap;
 
-        if (ap > bp) {
-          ta.wins += 1;
-          tb.losses += 1;
-        } else if (bp > ap) {
-          tb.wins += 1;
-          ta.losses += 1;
+          if (bp > ap) tb.wins += 1;
+          else if (ap > bp) tb.losses += 1;
         }
       }
 
-      totals.set(m.team_a_id, { ...ta });
-      totals.set(m.team_b_id, { ...tb });
+      if (!aIsGhost && ta) totals.set(m.team_a_id, { ...ta });
+      if (!bIsGhost && tb) totals.set(m.team_b_id, { ...tb });
     }
 
     const allTeams = Array.from(totals.values());
@@ -500,7 +526,15 @@ export default function StandingsScreen() {
 
       return { divisionName, rows: list };
     });
-  }, [matches, scoresByMatchId, teamNameById, teamActiveById, teamDivisionById, divisionsById]);
+  }, [
+    matches,
+    scoresByMatchId,
+    teamNameById,
+    teamActiveById,
+    teamGhostById,
+    teamDivisionById,
+    divisionsById,
+  ]);
 
   const colRank = 44;
   const colGP = 52;
@@ -563,7 +597,9 @@ export default function StandingsScreen() {
 
             return (
               <View key={section.divisionName}>
-                <Text style={{ fontSize: 20, fontWeight: "900", marginBottom: 8, color: COLORS.text }}>
+                <Text
+                  style={{ fontSize: 20, fontWeight: "900", marginBottom: 8, color: COLORS.text }}
+                >
                   {section.divisionName}
                 </Text>
 
@@ -583,28 +619,84 @@ export default function StandingsScreen() {
                         backgroundColor: COLORS.headerBg,
                       }}
                     >
-                      <Text style={{ width: colRank, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colRank,
+                          paddingVertical: 10,
+                          textAlign: "center",
+                          fontWeight: "900",
+                        }}
+                      >
                         #
                       </Text>
-                      <Text style={{ width: colTeam, paddingVertical: 10, paddingHorizontal: 10, fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colTeam,
+                          paddingVertical: 10,
+                          paddingHorizontal: 10,
+                          fontWeight: "900",
+                        }}
+                      >
                         Team
                       </Text>
-                      <Text style={{ width: colGP, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colGP,
+                          paddingVertical: 10,
+                          textAlign: "center",
+                          fontWeight: "900",
+                        }}
+                      >
                         GP
                       </Text>
-                      <Text style={{ width: colW, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colW,
+                          paddingVertical: 10,
+                          textAlign: "center",
+                          fontWeight: "900",
+                        }}
+                      >
                         W
                       </Text>
-                      <Text style={{ width: colL, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colL,
+                          paddingVertical: 10,
+                          textAlign: "center",
+                          fontWeight: "900",
+                        }}
+                      >
                         L
                       </Text>
-                      <Text style={{ width: colPF, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colPF,
+                          paddingVertical: 10,
+                          textAlign: "center",
+                          fontWeight: "900",
+                        }}
+                      >
                         PF
                       </Text>
-                      <Text style={{ width: colPA, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colPA,
+                          paddingVertical: 10,
+                          textAlign: "center",
+                          fontWeight: "900",
+                        }}
+                      >
                         PA
                       </Text>
-                      <Text style={{ width: colDIFF, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                      <Text
+                        style={{
+                          width: colDIFF,
+                          paddingVertical: 10,
+                          textAlign: "center",
+                          fontWeight: "900",
+                        }}
+                      >
                         DIFF
                       </Text>
                     </View>
@@ -625,7 +717,14 @@ export default function StandingsScreen() {
                               opacity: inactive ? 0.55 : 1,
                             }}
                           >
-                            <Text style={{ width: colRank, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                            <Text
+                              style={{
+                                width: colRank,
+                                paddingVertical: 10,
+                                textAlign: "center",
+                                fontWeight: "900",
+                              }}
+                            >
                               {idx + 1}
                             </Text>
 
@@ -646,10 +745,24 @@ export default function StandingsScreen() {
                             <Text style={{ width: colGP, paddingVertical: 10, textAlign: "center" }}>
                               {r.gamesPlayed}
                             </Text>
-                            <Text style={{ width: colW, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                            <Text
+                              style={{
+                                width: colW,
+                                paddingVertical: 10,
+                                textAlign: "center",
+                                fontWeight: "900",
+                              }}
+                            >
                               {r.wins}
                             </Text>
-                            <Text style={{ width: colL, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                            <Text
+                              style={{
+                                width: colL,
+                                paddingVertical: 10,
+                                textAlign: "center",
+                                fontWeight: "900",
+                              }}
+                            >
                               {r.losses}
                             </Text>
                             <Text style={{ width: colPF, paddingVertical: 10, textAlign: "center" }}>
@@ -658,7 +771,14 @@ export default function StandingsScreen() {
                             <Text style={{ width: colPA, paddingVertical: 10, textAlign: "center" }}>
                               {r.pointsAgainst}
                             </Text>
-                            <Text style={{ width: colDIFF, paddingVertical: 10, textAlign: "center", fontWeight: "900" }}>
+                            <Text
+                              style={{
+                                width: colDIFF,
+                                paddingVertical: 10,
+                                textAlign: "center",
+                                fontWeight: "900",
+                              }}
+                            >
                               {d}
                             </Text>
                           </View>
