@@ -22,7 +22,11 @@ const HEADER_OFFSET = 90;
 export default function Home() {
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const isMobileWeb = Platform.OS === "web" && width < 900;
+  const isMobileWeb =
+  Platform.OS === "web" &&
+  (width < 900 ||
+    (typeof navigator !== "undefined" &&
+      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)));
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
