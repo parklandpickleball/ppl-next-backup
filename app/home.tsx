@@ -9,10 +9,10 @@ import {
   Platform,
   Image,
   Modal,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../constants/supabaseClient";
-
 
 const LOGO = require("../assets/images/icon.png");
 const HERO_BG = require("../assets/images/hero.jpg");
@@ -21,77 +21,86 @@ const HEADER_OFFSET = 90;
 
 export default function Home() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isMobileWeb = Platform.OS === "web" && width < 900;
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
   // ✅ store measured Y positions for each section
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
-const [galleryLoading, setGalleryLoading] = useState(true);
-const galleryPreview = galleryUrls.slice(0, 4);
-const [galleryOpen, setGalleryOpen] = useState(false);
-const [galleryIndex, setGalleryIndex] = useState(0);
-const [galleryMode, setGalleryMode] = useState<"gallery" | "commissioners">("gallery");
-const openGalleryAt = (i: number) => { setGalleryMode("gallery"); setGalleryIndex(i); setGalleryOpen(true); };
-
+  const [galleryLoading, setGalleryLoading] = useState(true);
+  const galleryPreview = galleryUrls.slice(0, 4);
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [galleryMode, setGalleryMode] = useState<"gallery" | "commissioners">(
+    "gallery"
+  );
+  const openGalleryAt = (i: number) => {
+    setGalleryMode("gallery");
+    setGalleryIndex(i);
+    setGalleryOpen(true);
+  };
 
   if (Platform.OS !== "web") return null;
+
   useEffect(() => {
-  let alive = true;
+    let alive = true;
 
-  const loadGallery = async () => {
-    try {
-      setGalleryLoading(true);
+    const loadGallery = async () => {
+      try {
+        setGalleryLoading(true);
 
-      const BUCKET = "website_gallery";
+        const BUCKET = "website_gallery";
 
-      let { data, error } = await supabase.storage.from(BUCKET).list(".", {
-        limit: 100,
-        offset: 0,
-        sortBy: { column: "name", order: "asc" },
-      });
+        let { data, error } = await supabase.storage.from(BUCKET).list(".", {
+          limit: 100,
+          offset: 0,
+          sortBy: { column: "name", order: "asc" },
+        });
 
-      // fallback for older behavior
-if ((!data || data.length === 0) && !error) {
-  const res = await supabase.storage.from(BUCKET).list("", {
-    limit: 100,
-    offset: 0,
-    sortBy: { column: "name", order: "asc" },
-  });
-  data = res.data as any;
-  error = res.error as any;
-}
+        // fallback for older behavior
+        if ((!data || data.length === 0) && !error) {
+          const res = await supabase.storage.from(BUCKET).list("", {
+            limit: 100,
+            offset: 0,
+            sortBy: { column: "name", order: "asc" },
+          });
+          data = res.data as any;
+          error = res.error as any;
+        }
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const files = (data || [])
-  .filter((f) => !!f.name && !f.name.startsWith("."))
-  .map((f) => f.name);
+        const files = (data || [])
+          .filter((f) => !!f.name && !f.name.startsWith("."))
+          .map((f) => f.name);
 
-const signed: string[] = [];
-for (const name of files) {
-  const { data: s, error: sErr } = await supabase.storage.from(BUCKET).createSignedUrl(name, 60 * 60);
-  if (!sErr && s?.signedUrl) signed.push(s.signedUrl);
-}
+        const signed: string[] = [];
+        for (const name of files) {
+          const { data: s, error: sErr } = await supabase.storage
+            .from(BUCKET)
+            .createSignedUrl(name, 60 * 60);
+          if (!sErr && s?.signedUrl) signed.push(s.signedUrl);
+        }
 
-const urls = signed;
+        const urls = signed;
 
+        if (alive) setGalleryUrls(urls);
+        console.log("GALLERY URL ORDER:", urls);
+      } catch {
+        if (alive) setGalleryUrls([]);
+      } finally {
+        if (alive) setGalleryLoading(false);
+      }
+    };
 
-      if (alive) setGalleryUrls(urls);
-      console.log("GALLERY URL ORDER:", urls);
-
-    } catch {
-      if (alive) setGalleryUrls([]);
-    } finally {
-      if (alive) setGalleryLoading(false);
-    }
-  };
-
-  loadGallery();
-  return () => {
-    alive = false;
-  };
-}, []);
-
+    loadGallery();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const goPortal = () => router.push("/league-lock");
 
@@ -103,7 +112,7 @@ const urls = signed;
     });
   };
 
- const scrollTo = (key: string) => {
+  const scrollTo = (key: string) => {
     const el = document.getElementById(key);
     if (!el) return;
 
@@ -116,13 +125,26 @@ const urls = signed;
     (document.activeElement as HTMLElement | null)?.blur?.();
   };
 
+  const mobileGo = (key: string) => {
+    setMobileMenuOpen(false);
+    scrollTo(key);
+  };
+
+  const mobilePortal = () => {
+    setMobileMenuOpen(false);
+    goPortal();
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.bg} />
 
       {/* ✅ ScrollView now wraps EVERYTHING (including hero) so wheel works anywhere */}
-      <ScrollView ref={scrollRef} style={styles.scroll} contentContainerStyle={styles.page}>
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.page}
+      >
         {/* HERO (full-bleed) */}
         <View style={styles.hero}>
           <View style={styles.heroBg}>
@@ -132,26 +154,124 @@ const urls = signed;
             <View style={styles.heroVignette} />
 
             {/* top nav (center links, keep member portal far-right) */}
-            <View style={styles.heroTopNav}>
+            <View
+              style={[
+                styles.heroTopNav,
+                { flexDirection: "row", justifyContent: "space-between" },
+              ]}
+            >
               <View style={styles.heroTopInner}>
                 <Image source={LOGO} style={styles.topLogo} resizeMode="contain" />
 
-                {/* center slot */}
-                <View style={styles.topLinksSlot}>
-                  <View style={styles.topLinks}>
-                    <TopLink label="LEAGUE INFORMATION" onPress={() => scrollTo("league-info")} />
-                    <TopLink label="MEMBERSHIP" onPress={() => scrollTo("membership")} />
-                    <TopLink label="GALLERY" onPress={() => scrollTo("gallery")} />
-                    <TopLink label="SPONSORS" onPress={() => scrollTo("sponsors")} />
-                    <TopLink label="CONTACT" onPress={() => scrollTo("contact")} />
+                {/* ✅ MOBILE WEB: hamburger only */}
+                {isMobileWeb ? (
+                  <View style={styles.mobileNavRight}>
+                    <Pressable
+                      onPress={() => setMobileMenuOpen(true)}
+                      style={styles.hamburgerBtn}
+                    >
+                      <Text style={styles.hamburgerText}>☰</Text>
+                    </Pressable>
                   </View>
-                </View>
+                ) : (
+                  <>
+                    {/* center slot */}
+                    <View style={styles.topLinksSlot}>
+                      <View style={styles.topLinks}>
+                        <TopLink
+                          label="LEAGUE INFORMATION"
+                          onPress={() => scrollTo("league-info")}
+                        />
+                        <TopLink
+                          label="MEMBERSHIP"
+                          onPress={() => scrollTo("membership")}
+                        />
+                        <TopLink label="GALLERY" onPress={() => scrollTo("gallery")} />
+                        <TopLink
+                          label="SPONSORS"
+                          onPress={() => scrollTo("sponsors")}
+                        />
+                        <TopLink label="CONTACT" onPress={() => scrollTo("contact")} />
+                      </View>
+                    </View>
 
-                <Pressable onPress={goPortal} style={styles.memberLoginBtn}>
-                  <Text style={styles.memberLoginText}>MEMBER PORTAL</Text>
-                </Pressable>
+                    <Pressable onPress={goPortal} style={styles.memberLoginBtn}>
+                      <Text style={styles.memberLoginText}>MEMBER PORTAL</Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
             </View>
+
+            {/* ✅ MOBILE WEB MENU MODAL */}
+            {isMobileWeb && (
+              <Modal
+                visible={mobileMenuOpen}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setMobileMenuOpen(false)}
+              >
+                <View style={styles.mobileMenuBackdrop}>
+                  <Pressable
+                    style={styles.mobileMenuBackdropPress}
+                    onPress={() => setMobileMenuOpen(false)}
+                  />
+
+                  <View style={styles.mobileMenuCard}>
+                    <View style={styles.mobileMenuHeader}>
+                      <Text style={styles.mobileMenuTitle}>Menu</Text>
+                      <Pressable
+                        onPress={() => setMobileMenuOpen(false)}
+                        style={styles.mobileMenuClose}
+                      >
+                        <Text style={styles.mobileMenuCloseText}>✕</Text>
+                      </Pressable>
+                    </View>
+
+                    <Pressable onPress={mobilePortal} style={styles.mobileMenuItemPrimary}>
+                      <Text style={styles.mobileMenuItemPrimaryText}>
+                        MEMBER PORTAL
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => mobileGo("league-info")}
+                      style={styles.mobileMenuItem}
+                    >
+                      <Text style={styles.mobileMenuItemText}>LEAGUE INFORMATION</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => mobileGo("membership")}
+                      style={styles.mobileMenuItem}
+                    >
+                      <Text style={styles.mobileMenuItemText}>MEMBERSHIP</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => mobileGo("gallery")}
+                      style={styles.mobileMenuItem}
+                    >
+                      <Text style={styles.mobileMenuItemText}>GALLERY</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => mobileGo("sponsors")}
+                      style={styles.mobileMenuItem}
+                    >
+                      <Text style={styles.mobileMenuItemText}>SPONSORS</Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() => mobileGo("contact")}
+                      style={styles.mobileMenuItem}
+                    >
+                      <Text style={styles.mobileMenuItemText}>CONTACT</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </Modal>
+            )}
 
             {/* premium card sitting over hero bottom (STARTING POINT) */}
             <View style={styles.heroCardOuter}>
@@ -254,30 +374,31 @@ const urls = signed;
             style={styles.sectionBand}
           >
             <View style={styles.container}>
-  <View style={styles.heroCard}>
-    <View style={styles.sectionHeaderRow}>
-      <Text style={styles.sectionTitle}>Membership</Text>
-      <Text style={styles.sectionBody}>
-        Ready to join? Membership is offered on a seasonal basis and structured by division to preserve
-        competitive integrity and league standards. Official registration details and key dates will be
-        published here prior to each season. For membership inquiries, please contact the League Commissioner
-        using the contact link below.
-      </Text>
-    </View>
+              <View style={styles.heroCard}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>Membership</Text>
+                  <Text style={styles.sectionBody}>
+                    Ready to join? Membership is offered on a seasonal basis and structured by division to preserve
+                    competitive integrity and league standards. Official registration details and key dates will be
+                    published here prior to each season. For membership inquiries, please contact the League Commissioner
+                    using the contact link below.
+                  </Text>
+                </View>
 
-
-              {/* Contact Card */}
-              <Pressable
-                onPress={() =>
-                  (window.location.href =
-                    "mailto:parklandpickleballleague@gmail.com?subject=Membership%20Inquiry%20-%20Parkland%20Pickleball%20League")
-                }
-                style={styles.membershipCard}
-              >
-                <Text style={styles.membershipCardAction}>Contact the League Commissioner →</Text>
-              </Pressable>
+                {/* Contact Card */}
+                <Pressable
+                  onPress={() =>
+                    (window.location.href =
+                      "mailto:parklandpickleballleague@gmail.com?subject=Membership%20Inquiry%20-%20Parkland%20Pickleball%20League")
+                  }
+                  style={styles.membershipCard}
+                >
+                  <Text style={styles.membershipCardAction}>
+                    Contact the League Commissioner →
+                  </Text>
+                </Pressable>
+              </View>
             </View>
-          </View>
           </View>
 
           {/* GALLERY */}
@@ -287,54 +408,55 @@ const urls = signed;
             onLayout={(e) => onSectionLayout("gallery", e.nativeEvent.layout.y)}
             style={styles.sectionBand}
           >
-           <View style={styles.container}>
-  <View style={styles.heroCard}>
-    <View style={styles.sectionHeaderRow}>
-      <Text style={styles.sectionTitle}>Gallery</Text>
-    </View>
+            <View style={styles.container}>
+              <View style={styles.heroCard}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>Gallery</Text>
+                </View>
 
-  <View style={styles.galleryGrid}>
-  {galleryLoading ? (
-    <Text style={styles.sectionBody}>Loading photos…</Text>
-  ) : galleryUrls.length === 0 ? (
-    <Text style={styles.sectionBody}>No photos yet.</Text>
-  ) : (
-    galleryPreview.map((uri, i) => (
-      <GalleryTile key={uri} uri={uri} onPress={() => openGalleryAt(i)} />
-    ))
-  )}
-</View>
+                <View style={styles.galleryGrid}>
+                  {galleryLoading ? (
+                    <Text style={styles.sectionBody}>Loading photos…</Text>
+                  ) : galleryUrls.length === 0 ? (
+                    <Text style={styles.sectionBody}>No photos yet.</Text>
+                  ) : (
+                    galleryPreview.map((uri, i) => (
+                      <GalleryTile key={uri} uri={uri} onPress={() => openGalleryAt(i)} />
+                    ))
+                  )}
+                </View>
 
-{!galleryLoading && galleryUrls.length > 4 && (
-  <Pressable onPress={() => openGalleryAt(0)} style={styles.viewAllBtn}>
-    <Text style={styles.viewAllBtnText}>VIEW ALL PHOTOS</Text>
-  </Pressable>
-)}
-{/* MEET THE COMMISSIONERS (inside Gallery box) */}
-{!galleryLoading && galleryUrls.length >= 7 && (
-  <View style={styles.commissionersBlock}>
-    <Text style={styles.commissionersTitle}>Meet The Commissioners</Text>
+                {!galleryLoading && galleryUrls.length > 4 && (
+                  <Pressable onPress={() => openGalleryAt(0)} style={styles.viewAllBtn}>
+                    <Text style={styles.viewAllBtnText}>VIEW ALL PHOTOS</Text>
+                  </Pressable>
+                )}
 
-<Pressable
-  onPress={() => {
-    setGalleryMode("commissioners");
-    setGalleryIndex(6);
-    setGalleryOpen(true);
-  }}
-  style={styles.commissionerPhotoWrap}
->
-<Image source={{ uri: galleryUrls[6] }} resizeMode="cover" style={styles.commissionerPhoto as any} />
-      <View style={styles.commissionerOverlay}>
-        <Text style={styles.commissionerOverlayText}>VIEW</Text>
-      </View>
-    </Pressable>
-  </View>
-)}
+                {/* MEET THE COMMISSIONERS (inside Gallery box) */}
+                {!galleryLoading && galleryUrls.length >= 7 && (
+                  <View style={styles.commissionersBlock}>
+                    <Text style={styles.commissionersTitle}>Meet The Commissioners</Text>
 
-
-
-  </View>
-
+                    <Pressable
+                      onPress={() => {
+                        setGalleryMode("commissioners");
+                        setGalleryIndex(6);
+                        setGalleryOpen(true);
+                      }}
+                      style={styles.commissionerPhotoWrap}
+                    >
+                      <Image
+                        source={{ uri: galleryUrls[6] }}
+                        resizeMode="cover"
+                        style={styles.commissionerPhoto as any}
+                      />
+                      <View style={styles.commissionerOverlay}>
+                        <Text style={styles.commissionerOverlayText}>VIEW</Text>
+                      </View>
+                    </Pressable>
+                  </View>
+                )}
+              </View>
             </View>
           </View>
 
@@ -346,31 +468,30 @@ const urls = signed;
             style={styles.sectionBand}
           >
             <View style={styles.container}>
-  <View style={styles.heroCard}>
-    <View style={styles.sectionHeaderRow}>
-      <Text style={styles.sectionTitle}>Sponsors</Text>
-      <Text style={styles.sectionBody}>Proudly supported by our league partners.</Text>
-    </View>
+              <View style={styles.heroCard}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitle}>Sponsors</Text>
+                  <Text style={styles.sectionBody}>Proudly supported by our league partners.</Text>
+                </View>
 
-    <View style={styles.sponsorGrid}>
-      <SponsorCard
-        name="Diadem Sports"
-        url="https://diademsports.com/"
-        logo={require("../assets/images/Sponsors/diadem.png")}
-      />
-      <SponsorCard
-        name="Ellie Mental Health of Pembroke Pines, FL"
-        url="https://elliementalhealth.com/"
-        logo={require("../assets/images/Sponsors/ellie.png")}
-      />
-      <SponsorCard
-        name="Zenov BPO"
-        url="https://www.zenov-bpo.com/"
-        logo={require("../assets/images/Sponsors/zenov.png")}
-      />
-    </View>
-  </View>
-
+                <View style={styles.sponsorGrid}>
+                  <SponsorCard
+                    name="Diadem Sports"
+                    url="https://diademsports.com/"
+                    logo={require("../assets/images/Sponsors/diadem.png")}
+                  />
+                  <SponsorCard
+                    name="Ellie Mental Health of Pembroke Pines, FL"
+                    url="https://elliementalhealth.com/"
+                    logo={require("../assets/images/Sponsors/ellie.png")}
+                  />
+                  <SponsorCard
+                    name="Zenov BPO"
+                    url="https://www.zenov-bpo.com/"
+                    logo={require("../assets/images/Sponsors/zenov.png")}
+                  />
+                </View>
+              </View>
             </View>
           </View>
 
@@ -382,80 +503,86 @@ const urls = signed;
             style={styles.sectionBand}
           >
             <View style={styles.container}>
-  <View style={styles.heroCard}>
-    <View style={styles.sectionHeaderRow}>
-      <Text style={styles.sectionKicker}>GET IN TOUCH</Text>
-      <Text style={styles.sectionTitle}>Contact</Text>
-      <Text style={styles.sectionBody}>
-        For sponsorship, membership, or general questions, email the league.
-      </Text>
+              <View style={styles.heroCard}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionKicker}>GET IN TOUCH</Text>
+                  <Text style={styles.sectionTitle}>Contact</Text>
+                  <Text style={styles.sectionBody}>
+                    For sponsorship, membership, or general questions, email the league.
+                  </Text>
 
-      <Pressable
-        onPress={() => {
-          window.location.href =
-            "mailto:parklandpickleballleague@gmail.com?subject=Parkland%20Pickleball%20League%20Inquiry";
-        }}
-        style={styles.contactBtn}
-      >
-        <Text style={styles.contactBtnText}>Email Parkland Pickleball League</Text>
-      </Pressable>
-    </View>
+                  <Pressable
+                    onPress={() => {
+                      window.location.href =
+                        "mailto:parklandpickleballleague@gmail.com?subject=Parkland%20Pickleball%20League%20Inquiry";
+                    }}
+                    style={styles.contactBtn}
+                  >
+                    <Text style={styles.contactBtnText}>Email Parkland Pickleball League</Text>
+                  </Pressable>
+                </View>
 
-    <Text style={styles.footerFinePrint}>
-      © {new Date().getFullYear()} Parkland Pickleball League
-    </Text>
-  </View>
-  </View>
-
-          </View>
-        </View>
-<Modal visible={galleryOpen} transparent animationType="fade" onRequestClose={() => { setGalleryOpen(false); setGalleryMode("gallery"); }}>
-        <View style={styles.lightboxBackdrop}>
-          <Pressable style={styles.lightboxBackdropPress} onPress={() => setGalleryOpen(false)} />
-
-          <View style={styles.lightboxCard}>
-            <Image
-              source={{ uri: galleryUrls[galleryIndex] }}
-              resizeMode="contain"
-              style={styles.lightboxImg as any}
-            />
-
-            <View style={styles.lightboxControls}>
-            {galleryMode !== "commissioners" && (
-  <Pressable
-    onPress={() => setGalleryIndex((i) => (i - 1 + galleryUrls.length) % galleryUrls.length)}
-    style={styles.lightboxBtn}
-  >
-    <Text style={styles.lightboxBtnText}>← Prev</Text>
-  </Pressable>
-)}
-
-
-              <Pressable
-  onPress={() => {
-    setGalleryOpen(false);
-    setGalleryMode("gallery");
-  }}
-  style={styles.lightboxBtn}
->
-  <Text style={styles.lightboxBtnText}>Close</Text>
-</Pressable>
-
-
-              {galleryMode !== "commissioners" && (
-  <Pressable
-    onPress={() => setGalleryIndex((i) => (i + 1) % galleryUrls.length)}
-    style={styles.lightboxBtn}
-  >
-    <Text style={styles.lightboxBtnText}>Next →</Text>
-  </Pressable>
-)}
-
+                <Text style={styles.footerFinePrint}>
+                  © {new Date().getFullYear()} Parkland Pickleball League
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-      </Modal>
 
+        <Modal
+          visible={galleryOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setGalleryOpen(false);
+            setGalleryMode("gallery");
+          }}
+        >
+          <View style={styles.lightboxBackdrop}>
+            <Pressable style={styles.lightboxBackdropPress} onPress={() => setGalleryOpen(false)} />
+
+            <View style={styles.lightboxCard}>
+              <Image
+                source={{ uri: galleryUrls[galleryIndex] }}
+                resizeMode="contain"
+                style={styles.lightboxImg as any}
+              />
+
+              <View style={styles.lightboxControls}>
+                {galleryMode !== "commissioners" && (
+                  <Pressable
+                    onPress={() =>
+                      setGalleryIndex((i) => (i - 1 + galleryUrls.length) % galleryUrls.length)
+                    }
+                    style={styles.lightboxBtn}
+                  >
+                    <Text style={styles.lightboxBtnText}>← Prev</Text>
+                  </Pressable>
+                )}
+
+                <Pressable
+                  onPress={() => {
+                    setGalleryOpen(false);
+                    setGalleryMode("gallery");
+                  }}
+                  style={styles.lightboxBtn}
+                >
+                  <Text style={styles.lightboxBtnText}>Close</Text>
+                </Pressable>
+
+                {galleryMode !== "commissioners" && (
+                  <Pressable
+                    onPress={() => setGalleryIndex((i) => (i + 1) % galleryUrls.length)}
+                    style={styles.lightboxBtn}
+                  >
+                    <Text style={styles.lightboxBtnText}>Next →</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );
@@ -518,8 +645,6 @@ function GalleryTile({ uri, onPress }: { uri: string; onPress: () => void }) {
     </Pressable>
   );
 }
-
-
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#FFFFFF" },
@@ -650,6 +775,123 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 2.2,
     fontSize: 12,
+  } as any,
+
+  // ✅ MOBILE HAMBURGER + MENU
+  mobileNavRight: {
+    marginLeft: "auto" as any,
+    alignItems: "flex-end",
+    justifyContent: "center",
+  } as any,
+
+  hamburgerBtn: {
+    width: 52,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.14)" as any,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.22)" as any,
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer" as any,
+  } as any,
+
+  hamburgerText: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 22,
+  } as any,
+
+  mobileMenuBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.62)" as any,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 18,
+  } as any,
+
+  mobileMenuBackdropPress: {
+    ...StyleSheet.absoluteFillObject,
+  },
+
+  mobileMenuCard: {
+    width: "100%",
+    maxWidth: 520,
+    backgroundColor: "#0B1220",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.16)" as any,
+    padding: 16,
+    boxShadow: "0 22px 60px rgba(0,0,0,0.55)" as any,
+  } as any,
+
+  mobileMenuHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  } as any,
+
+  mobileMenuTitle: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 16,
+    letterSpacing: 0.6,
+  } as any,
+
+  mobileMenuClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.10)" as any,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)" as any,
+    cursor: "pointer" as any,
+  } as any,
+
+  mobileMenuCloseText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 16,
+  } as any,
+
+  mobileMenuItemPrimary: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.92)" as any,
+    marginBottom: 10,
+    cursor: "pointer" as any,
+  } as any,
+
+  mobileMenuItemPrimaryText: {
+    color: "#0F172A",
+    fontWeight: "900",
+    letterSpacing: 2.0,
+    fontSize: 12,
+    textAlign: "center",
+  } as any,
+
+  mobileMenuItem: {
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.08)" as any,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)" as any,
+    marginTop: 10,
+    cursor: "pointer" as any,
+  } as any,
+
+  mobileMenuItemText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    fontSize: 12,
+    textAlign: "center",
   } as any,
 
   heroCardOuter: {
@@ -1040,7 +1282,8 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     textAlign: "center",
   },
-    lightboxBackdrop: {
+
+  lightboxBackdrop: {
     position: "absolute",
     left: 0,
     right: 0,
@@ -1096,7 +1339,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   } as any,
 
-    viewAllBtn: {
+  viewAllBtn: {
     marginTop: 18,
     alignSelf: "center",
     paddingVertical: 12,
@@ -1114,7 +1357,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   } as any,
 
-    commissionersBlock: {
+  commissionersBlock: {
     marginTop: 28,
     width: "100%",
     maxWidth: 980,
@@ -1170,7 +1413,4 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: "rgba(0,0,0,0.18)" as any,
   } as any,
-
-
-
 });
