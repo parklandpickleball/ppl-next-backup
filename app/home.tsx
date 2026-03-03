@@ -23,10 +23,10 @@ export default function Home() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isMobileWeb =
-  Platform.OS === "web" &&
-  (width < 900 ||
-    (typeof navigator !== "undefined" &&
-      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)));
+    Platform.OS === "web" &&
+    (width < 900 ||
+      (typeof navigator !== "undefined" &&
+        /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)));
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
@@ -157,55 +157,69 @@ export default function Home() {
             {/* vignette */}
             <View style={styles.heroVignette} />
 
-            {/* top nav (center links, keep member portal far-right) */}
-            <View
-              style={[
-                styles.heroTopNav,
-                { flexDirection: "row", justifyContent: "space-between" },
-              ]}
-            >
-              <View style={styles.heroTopInner}>
-                <Image source={LOGO} style={styles.topLogo} resizeMode="contain" />
-
-                {/* ✅ MOBILE WEB: hamburger only */}
-                {isMobileWeb ? (
-                  <View style={styles.mobileNavRight}>
-                    <Pressable
-                      onPress={() => setMobileMenuOpen(true)}
-                      style={styles.hamburgerBtn}
-                    >
-                      <Text style={styles.hamburgerText}>☰</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <>
-                    {/* center slot */}
-                    <View style={styles.topLinksSlot}>
-                      <View style={styles.topLinks}>
-                        <TopLink
-                          label="LEAGUE INFORMATION"
-                          onPress={() => scrollTo("league-info")}
-                        />
-                        <TopLink
-                          label="MEMBERSHIP"
-                          onPress={() => scrollTo("membership")}
-                        />
-                        <TopLink label="GALLERY" onPress={() => scrollTo("gallery")} />
-                        <TopLink
-                          label="SPONSORS"
-                          onPress={() => scrollTo("sponsors")}
-                        />
-                        <TopLink label="CONTACT" onPress={() => scrollTo("contact")} />
-                      </View>
-                    </View>
-
-                    <Pressable onPress={goPortal} style={styles.memberLoginBtn}>
-                      <Text style={styles.memberLoginText}>MEMBER PORTAL</Text>
-                    </Pressable>
-                  </>
-                )}
+            {/* ✅ TOP NAV
+                - Desktop: EXACTLY the same as before
+                - Mobile web: force a simple topbar (logo + hamburger) so it ALWAYS appears in portrait */}
+            {isMobileWeb ? (
+              <View style={styles.mobileTopBar}>
+                <Image
+                  source={LOGO}
+                  style={styles.mobileTopLogo}
+                  resizeMode="contain"
+                />
+                <Pressable
+                  onPress={() => setMobileMenuOpen(true)}
+                  style={styles.hamburgerBtn}
+                >
+                  <Text style={styles.hamburgerText}>☰</Text>
+                </Pressable>
               </View>
-            </View>
+            ) : (
+              <View
+                style={[
+                  styles.heroTopNav,
+                  { flexDirection: "row", justifyContent: "space-between" },
+                ]}
+              >
+                <View style={styles.heroTopInner}>
+                  <Image
+                    source={LOGO}
+                    style={styles.topLogo}
+                    resizeMode="contain"
+                  />
+
+                  {/* center slot */}
+                  <View style={styles.topLinksSlot}>
+                    <View style={styles.topLinks}>
+                      <TopLink
+                        label="LEAGUE INFORMATION"
+                        onPress={() => scrollTo("league-info")}
+                      />
+                      <TopLink
+                        label="MEMBERSHIP"
+                        onPress={() => scrollTo("membership")}
+                      />
+                      <TopLink
+                        label="GALLERY"
+                        onPress={() => scrollTo("gallery")}
+                      />
+                      <TopLink
+                        label="SPONSORS"
+                        onPress={() => scrollTo("sponsors")}
+                      />
+                      <TopLink
+                        label="CONTACT"
+                        onPress={() => scrollTo("contact")}
+                      />
+                    </View>
+                  </View>
+
+                  <Pressable onPress={goPortal} style={styles.memberLoginBtn}>
+                    <Text style={styles.memberLoginText}>MEMBER PORTAL</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
 
             {/* ✅ MOBILE WEB MENU MODAL */}
             {isMobileWeb && (
@@ -232,7 +246,10 @@ export default function Home() {
                       </Pressable>
                     </View>
 
-                    <Pressable onPress={mobilePortal} style={styles.mobileMenuItemPrimary}>
+                    <Pressable
+                      onPress={mobilePortal}
+                      style={styles.mobileMenuItemPrimary}
+                    >
                       <Text style={styles.mobileMenuItemPrimaryText}>
                         MEMBER PORTAL
                       </Text>
@@ -242,7 +259,9 @@ export default function Home() {
                       onPress={() => mobileGo("league-info")}
                       style={styles.mobileMenuItem}
                     >
-                      <Text style={styles.mobileMenuItemText}>LEAGUE INFORMATION</Text>
+                      <Text style={styles.mobileMenuItemText}>
+                        LEAGUE INFORMATION
+                      </Text>
                     </Pressable>
 
                     <Pressable
@@ -284,14 +303,18 @@ export default function Home() {
                   <Text style={styles.heroCardKicker}>PARKLAND • FLORIDA</Text>
                 </View>
 
-                <Text style={styles.heroCardTitle}>Parkland Pickleball League</Text>
+                <Text style={styles.heroCardTitle}>
+                  Parkland Pickleball League
+                </Text>
 
                 <Text style={styles.heroCardBody}>
-                  The Parkland Pickleball League is built on competitive excellence, sportsmanship, and a strong sense
-                  of community. Each season operates with structured match scheduling, live standings and results, and a
-                  fully integrated league portal designed for transparency and performance tracking. With high standards
-                  of play and meaningful season-long competition, every match contributes to a larger competitive
-                  narrative.
+                  The Parkland Pickleball League is built on competitive
+                  excellence, sportsmanship, and a strong sense of community.
+                  Each season operates with structured match scheduling, live
+                  standings and results, and a fully integrated league portal
+                  designed for transparency and performance tracking. With high
+                  standards of play and meaningful season-long competition, every
+                  match contributes to a larger competitive narrative.
                 </Text>
 
                 <View style={styles.heroCardDivider} />
@@ -316,7 +339,9 @@ export default function Home() {
           <View
             nativeID="league-info"
             id="league-info"
-            onLayout={(e) => onSectionLayout("league-info", e.nativeEvent.layout.y)}
+            onLayout={(e) =>
+              onSectionLayout("league-info", e.nativeEvent.layout.y)
+            }
             style={styles.sectionBand}
           >
             <View style={styles.container}>
@@ -325,18 +350,21 @@ export default function Home() {
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>League Information</Text>
                   <Text style={styles.sectionBody}>
-                    Parkland Pickleball League is a structured, competitive league founded on sportsmanship and
-                    community.
+                    Parkland Pickleball League is a structured, competitive league
+                    founded on sportsmanship and community.
                   </Text>
 
                   <Text style={styles.sectionBody}>
-                    The league features three divisions designed to support competitive play at multiple levels. Both men
-                    and women participate, with mixed and unisex teams welcomed across all divisions.
+                    The league features three divisions designed to support
+                    competitive play at multiple levels. Both men and women
+                    participate, with mixed and unisex teams welcomed across all
+                    divisions.
                   </Text>
 
                   <Text style={styles.sectionBody}>
-                    League matches are presently held on Monday evenings at the Country Club of Coral Springs while the
-                    new Parkland courts are under development.
+                    League matches are presently held on Monday evenings at the
+                    Country Club of Coral Springs while the new Parkland courts are
+                    under development.
                   </Text>
                 </View>
 
@@ -374,7 +402,9 @@ export default function Home() {
           <View
             nativeID="membership"
             id="membership"
-            onLayout={(e) => onSectionLayout("membership", e.nativeEvent.layout.y)}
+            onLayout={(e) =>
+              onSectionLayout("membership", e.nativeEvent.layout.y)
+            }
             style={styles.sectionBand}
           >
             <View style={styles.container}>
@@ -382,10 +412,12 @@ export default function Home() {
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>Membership</Text>
                   <Text style={styles.sectionBody}>
-                    Ready to join? Membership is offered on a seasonal basis and structured by division to preserve
-                    competitive integrity and league standards. Official registration details and key dates will be
-                    published here prior to each season. For membership inquiries, please contact the League Commissioner
-                    using the contact link below.
+                    Ready to join? Membership is offered on a seasonal basis and
+                    structured by division to preserve competitive integrity and
+                    league standards. Official registration details and key dates
+                    will be published here prior to each season. For membership
+                    inquiries, please contact the League Commissioner using the
+                    contact link below.
                   </Text>
                 </View>
 
@@ -425,13 +457,20 @@ export default function Home() {
                     <Text style={styles.sectionBody}>No photos yet.</Text>
                   ) : (
                     galleryPreview.map((uri, i) => (
-                      <GalleryTile key={uri} uri={uri} onPress={() => openGalleryAt(i)} />
+                      <GalleryTile
+                        key={uri}
+                        uri={uri}
+                        onPress={() => openGalleryAt(i)}
+                      />
                     ))
                   )}
                 </View>
 
                 {!galleryLoading && galleryUrls.length > 4 && (
-                  <Pressable onPress={() => openGalleryAt(0)} style={styles.viewAllBtn}>
+                  <Pressable
+                    onPress={() => openGalleryAt(0)}
+                    style={styles.viewAllBtn}
+                  >
                     <Text style={styles.viewAllBtnText}>VIEW ALL PHOTOS</Text>
                   </Pressable>
                 )}
@@ -439,7 +478,9 @@ export default function Home() {
                 {/* MEET THE COMMISSIONERS (inside Gallery box) */}
                 {!galleryLoading && galleryUrls.length >= 7 && (
                   <View style={styles.commissionersBlock}>
-                    <Text style={styles.commissionersTitle}>Meet The Commissioners</Text>
+                    <Text style={styles.commissionersTitle}>
+                      Meet The Commissioners
+                    </Text>
 
                     <Pressable
                       onPress={() => {
@@ -475,7 +516,9 @@ export default function Home() {
               <View style={styles.heroCard}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>Sponsors</Text>
-                  <Text style={styles.sectionBody}>Proudly supported by our league partners.</Text>
+                  <Text style={styles.sectionBody}>
+                    Proudly supported by our league partners.
+                  </Text>
                 </View>
 
                 <View style={styles.sponsorGrid}>
@@ -512,7 +555,8 @@ export default function Home() {
                   <Text style={styles.sectionKicker}>GET IN TOUCH</Text>
                   <Text style={styles.sectionTitle}>Contact</Text>
                   <Text style={styles.sectionBody}>
-                    For sponsorship, membership, or general questions, email the league.
+                    For sponsorship, membership, or general questions, email the
+                    league.
                   </Text>
 
                   <Pressable
@@ -522,7 +566,9 @@ export default function Home() {
                     }}
                     style={styles.contactBtn}
                   >
-                    <Text style={styles.contactBtnText}>Email Parkland Pickleball League</Text>
+                    <Text style={styles.contactBtnText}>
+                      Email Parkland Pickleball League
+                    </Text>
                   </Pressable>
                 </View>
 
@@ -544,7 +590,10 @@ export default function Home() {
           }}
         >
           <View style={styles.lightboxBackdrop}>
-            <Pressable style={styles.lightboxBackdropPress} onPress={() => setGalleryOpen(false)} />
+            <Pressable
+              style={styles.lightboxBackdropPress}
+              onPress={() => setGalleryOpen(false)}
+            />
 
             <View style={styles.lightboxCard}>
               <Image
@@ -557,7 +606,9 @@ export default function Home() {
                 {galleryMode !== "commissioners" && (
                   <Pressable
                     onPress={() =>
-                      setGalleryIndex((i) => (i - 1 + galleryUrls.length) % galleryUrls.length)
+                      setGalleryIndex(
+                        (i) => (i - 1 + galleryUrls.length) % galleryUrls.length
+                      )
                     }
                     style={styles.lightboxBtn}
                   >
@@ -577,7 +628,9 @@ export default function Home() {
 
                 {galleryMode !== "commissioners" && (
                   <Pressable
-                    onPress={() => setGalleryIndex((i) => (i + 1) % galleryUrls.length)}
+                    onPress={() =>
+                      setGalleryIndex((i) => (i + 1) % galleryUrls.length)
+                    }
                     style={styles.lightboxBtn}
                   >
                     <Text style={styles.lightboxBtnText}>Next →</Text>
@@ -601,7 +654,9 @@ function TopLink({ label, onPress }: { label: string; onPress: () => void }) {
       onHoverOut={() => setHovered(false)}
       style={[styles.topLink, hovered && styles.topLinkHover]}
     >
-      <Text style={[styles.topLinkText, hovered && styles.topLinkTextHover]}>{label}</Text>
+      <Text style={[styles.topLinkText, hovered && styles.topLinkTextHover]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -626,7 +681,10 @@ function InfoCard({ title, body }: { title: string; body: string }) {
 
 function SponsorCard({ name, url, logo }: { name: string; url: string; logo: any }) {
   return (
-    <Pressable onPress={() => window.open(url, "_blank")} style={styles.sponsorCard}>
+    <Pressable
+      onPress={() => window.open(url, "_blank")}
+      style={styles.sponsorCard}
+    >
       <Image source={logo} resizeMode="contain" style={styles.sponsorLogoFill} />
       <Text style={styles.sponsorName}>{name}</Text>
     </Pressable>
@@ -642,7 +700,11 @@ function GalleryTile({ uri, onPress }: { uri: string; onPress: () => void }) {
       onHoverOut={() => setHovered(false)}
       style={[styles.galleryTile, hovered && styles.galleryTileHover]}
     >
-      <Image source={{ uri }} resizeMode="cover" style={styles.galleryImgFill as any} />
+      <Image
+        source={{ uri }}
+        resizeMode="cover"
+        style={styles.galleryImgFill as any}
+      />
       <View style={[styles.galleryOverlay, hovered && styles.galleryOverlayHover]}>
         <Text style={styles.galleryOverlayText}>VIEW</Text>
       </View>
@@ -695,7 +757,7 @@ const styles = StyleSheet.create({
       "radial-gradient(circle at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.62) 100%)" as any,
   } as any,
 
-  // TOP NAV OVER HERO (UNCHANGED)
+  // TOP NAV OVER HERO (DESKTOP ONLY)
   heroTopNav: {
     position: "absolute" as any,
     top: 0,
@@ -703,6 +765,7 @@ const styles = StyleSheet.create({
     right: 0,
     paddingTop: 16,
     paddingBottom: 10,
+    zIndex: 20 as any,
   } as any,
 
   heroTopInner: {
@@ -781,13 +844,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
   } as any,
 
-  // ✅ MOBILE HAMBURGER + MENU
-  mobileNavRight: {
-    marginLeft: "auto" as any,
-    alignItems: "flex-end",
-    justifyContent: "center",
+  // ✅ MOBILE TOP BAR (MOBILE WEB ONLY)
+  mobileTopBar: {
+    position: "absolute" as any,
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingTop: 14,
+    paddingBottom: 10,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 50 as any,
   } as any,
 
+  mobileTopLogo: {
+    width: 110,
+    height: 60,
+  } as any,
+
+  // ✅ HAMBURGER + MENU
   hamburgerBtn: {
     width: 52,
     height: 44,
@@ -1074,12 +1151,12 @@ const styles = StyleSheet.create({
 
   infoCard: {
     width: "32%",
-    minHeight: 190, // slightly taller for balance
+    minHeight: 190,
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     borderWidth: 1,
     borderColor: "rgba(15, 23, 42, 0.08)" as any,
-    paddingTop: 30, // fixed top spacing
+    paddingTop: 30,
     paddingBottom: 26,
     paddingHorizontal: 28,
     boxShadow: "0 18px 40px rgba(15, 23, 42, 0.10)" as any,
@@ -1087,19 +1164,19 @@ const styles = StyleSheet.create({
   } as any,
 
   infoCardTitle: {
-    fontSize: 18, // ⬅ bigger
+    fontSize: 18,
     fontWeight: "900",
     color: "#0F172A",
-    minHeight: 54, // ⬅ slightly taller to support size
+    minHeight: 54,
     textAlign: "center",
     letterSpacing: 0.3,
   },
 
   infoCardBody: {
     marginTop: 10,
-    fontSize: 15, // ⬅ larger
-    lineHeight: 24, // ⬅ better readability
-    color: "#475569", // ⬅ slightly darker for clarity
+    fontSize: 15,
+    lineHeight: 24,
+    color: "#475569",
     textAlign: "center",
   },
 
