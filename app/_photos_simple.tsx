@@ -80,7 +80,7 @@ export default function PhotosSimple() {
 
   const folderPrefix = SHARED_FOLDER;
 
-  // ✅ Prevent double-refresh loops (mobile Safari was crashing)
+  // Prevent stacked refreshes on web focus / double triggers
   const refreshInFlight = useRef(false);
 
   const grid = useMemo(() => {
@@ -107,10 +107,9 @@ export default function PhotosSimple() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ Only refresh on focus for native apps (NOT web)
   useFocusEffect(
     React.useCallback(() => {
-      if (Platform.OS === "web") return;
+      // Refresh every time the Photos tab is opened/tapped
       refreshList();
     }, [])
   );
@@ -120,7 +119,6 @@ export default function PhotosSimple() {
       setErr("");
       setStatus("loading");
 
-      // ✅ Do not auto-anon sign-in. We will offer a button instead.
       const { data: s1, error: e1 } = await supabase.auth.getSession();
       if (e1) throw e1;
 
@@ -157,10 +155,8 @@ export default function PhotosSimple() {
       const { error } = await supabase.auth.signInAnonymously();
       if (error) throw error;
 
-      // reload session + admin + list
       await init();
     } catch (e: any) {
-      // Most common: "Anonymous sign-ins are disabled"
       setErr(e?.message || String(e));
       console.log("GUEST SIGN-IN ERROR:", e);
     } finally {
@@ -171,6 +167,40 @@ export default function PhotosSimple() {
   function publicUrlForPath(path: string) {
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
+  }
+
+  // ✅ IMPORTANT: iOS Safari crashes when too many full-res images are loaded on web.
+  // Use Supabase render/image endpoint for thumbnails on web only.
+  function renderImageUrlFromPublicUrl(publicUrl: string, w: number, h: number, quality = 70) {
+    try {
+      if (!publicUrl) return publicUrl;
+      const u = new URL(publicUrl);
+      u.pathname = u.pathname.replace("/storage/v1/object/public/", "/storage/v1/render/image/public/");
+      u.searchParams.set("width", String(Math.max(1, Math.floor(w))));
+      u.searchParams.set("height", String(Math.max(1, Math.floor(h))));
+      u.searchParams.set("resize", "cover");
+      u.searchParams.set("quality", String(quality));
+      return u.toString();
+    } catch {
+      return publicUrl;
+    }
+  }
+
+  function gridThumbUrlForPath(path: string, tileSize: number) {
+    const publicUrl = publicUrlForPath(path);
+    if (Platform.OS !== "web") return publicUrl;
+    const s = Math.min(220, Math.max(100, Math.floor(tileSize * 1.2)));
+    return renderImageUrlFromPublicUrl(publicUrl, s, s, 65);
+  }
+
+  function viewerUrlForPath(path: string) {
+    const publicUrl = publicUrlForPath(path);
+    if (Platform.OS !== "web") return publicUrl;
+
+    // cap viewer render size so mobile Safari doesn't blow up memory
+    const targetW = Math.min(1400, Math.max(700, Math.floor(width * 1.5)));
+    const targetH = Math.min(1400, Math.max(700, Math.floor((height - 220) * 1.5)));
+    return renderImageUrlFromPublicUrl(publicUrl, targetW, targetH, 80);
   }
 
   async function fetchPage(p: number) {
@@ -190,11 +220,11 @@ export default function PhotosSimple() {
   }
 
   async function refreshList() {
-    // ✅ block duplicate refreshes (prevents Safari crash loop)
     if (refreshInFlight.current) return;
-    refreshInFlight.current = true;
 
     try {
+      refreshInFlight.current = true;
+
       setBusy(true);
       setErr("");
 
@@ -399,7 +429,7 @@ export default function PhotosSimple() {
   }, [viewerIndex, rows]);
 
   const currentPath = currentRow?.path || "";
-  const currentUrl = currentPath ? publicUrlForPath(currentPath) : "";
+  const currentUrl = currentPath ? viewerUrlForPath(currentPath) : "";
   const currentName = currentPath ? basename(currentPath) : "Photo";
 
   const canDeleteCurrent = useMemo(() => {
@@ -479,9 +509,7 @@ export default function PhotosSimple() {
       if (rowDelErr) throw rowDelErr;
 
       if (!deletedRows || deletedRows.length === 0) {
-        throw new Error(
-          "Delete was blocked by permissions (RLS). You are seeing a local UI delete only. Fix the photo_uploads delete policy."
-        );
+        throw new Error("Delete was blocked by permissions (RLS). Fix the photo_uploads delete policy.");
       }
 
       const newRows = rows.filter((r) => r.path !== currentPath);
@@ -553,11 +581,10 @@ export default function PhotosSimple() {
         maxToRenderPerBatch={12}
         windowSize={5}
         updateCellsBatchingPeriod={50}
-        // ✅ Do NOT enable this on web (it causes mobile Safari issues)
-        removeClippedSubviews={Platform.OS !== "web"}
+        // ✅ DO NOT use removeClippedSubviews on web (can behave badly on iOS Safari)
+        removeClippedSubviews={Platform.OS === "web" ? false : true}
         columnWrapperStyle={grid.numColumns > 1 ? { gap: grid.gutter } : undefined}
         contentContainerStyle={{ paddingBottom: 24, gap: grid.gutter }}
-        // ✅ scroll from anywhere (header is inside the scrollable list)
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.title}>Photos</Text>
@@ -598,11 +625,18 @@ export default function PhotosSimple() {
           </View>
         }
         renderItem={({ item, index }) => {
-          const url = publicUrlForPath(item.path);
+          const url = gridThumbUrlForPath(item.path, grid.tile);
 
           return (
-            <Pressable style={[styles.tile, { width: grid.tile, height: grid.tile + 28 }]} onPress={() => openViewerByIndex(index)}>
-              <Image source={{ uri: url }} style={[styles.tileImage, { width: grid.tile, height: grid.tile }]} resizeMode="cover" />
+            <Pressable
+              style={[styles.tile, { width: grid.tile, height: grid.tile + 28 }]}
+              onPress={() => openViewerByIndex(index)}
+            >
+              <Image
+                source={{ uri: url }}
+                style={[styles.tileImage, { width: grid.tile, height: grid.tile }]}
+                resizeMode="cover"
+              />
               <Text style={styles.tileText} numberOfLines={1}>
                 {basename(item.path)}
               </Text>
@@ -691,7 +725,11 @@ export default function PhotosSimple() {
                     scrollEnabled={zoom > 1}
                   >
                     <View style={{ width: width, height: viewerHeight, alignItems: "center", justifyContent: "center" }}>
-                      <Image source={{ uri: currentUrl }} resizeMode="contain" style={{ width: width, height: viewerHeight, transform: [{ scale: zoom }] }} />
+                      <Image
+                        source={{ uri: currentUrl }}
+                        resizeMode="contain"
+                        style={{ width: width, height: viewerHeight, transform: [{ scale: zoom }] }}
+                      />
                     </View>
                   </ScrollView>
                 </View>
