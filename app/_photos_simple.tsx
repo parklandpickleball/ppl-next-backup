@@ -22,8 +22,6 @@ import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAdminSession } from "@/lib/adminSession";
 
-
-
 type UploadRow = {
   path: string; // "shared/filename.jpg"
   uploader: string; // uid
@@ -60,9 +58,8 @@ function basename(p: string) {
 
 export default function PhotosSimple() {
   const { width, height } = useWindowDimensions();
-    const adminSession = useAdminSession() as any;
+  const adminSession = useAdminSession() as any;
   const unlockedAdmin = !!adminSession?.isAdminUnlocked;
-
 
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [err, setErr] = useState<string>("");
@@ -82,6 +79,9 @@ export default function PhotosSimple() {
   const [zoom, setZoom] = useState<number>(1);
 
   const folderPrefix = SHARED_FOLDER;
+
+  // ✅ Prevent double-refresh loops (mobile Safari was crashing)
+  const refreshInFlight = useRef(false);
 
   const grid = useMemo(() => {
     const gutter = 10;
@@ -106,13 +106,14 @@ export default function PhotosSimple() {
     init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useFocusEffect(
-  React.useCallback(() => {
-    // Refresh every time the Photos tab is opened/tapped
-    refreshList();
-  }, [])
-);
 
+  // ✅ Only refresh on focus for native apps (NOT web)
+  useFocusEffect(
+    React.useCallback(() => {
+      if (Platform.OS === "web") return;
+      refreshList();
+    }, [])
+  );
 
   async function init() {
     try {
@@ -189,6 +190,10 @@ export default function PhotosSimple() {
   }
 
   async function refreshList() {
+    // ✅ block duplicate refreshes (prevents Safari crash loop)
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+
     try {
       setBusy(true);
       setErr("");
@@ -209,6 +214,7 @@ export default function PhotosSimple() {
       console.log("PHOTOS LIST ERROR:", e);
     } finally {
       setBusy(false);
+      refreshInFlight.current = false;
     }
   }
 
@@ -397,11 +403,10 @@ export default function PhotosSimple() {
   const currentName = currentPath ? basename(currentPath) : "Photo";
 
   const canDeleteCurrent = useMemo(() => {
-  if (!userId || !currentRow) return false;
-  if (isAdmin || unlockedAdmin) return true;
-  return currentRow.uploader === userId;
-}, [userId, isAdmin, unlockedAdmin, currentRow]);
-
+    if (!userId || !currentRow) return false;
+    if (isAdmin || unlockedAdmin) return true;
+    return currentRow.uploader === userId;
+  }, [userId, isAdmin, unlockedAdmin, currentRow]);
 
   const hasPrev = viewerIndex > 0;
   const hasNext = viewerIndex >= 0 && viewerIndex < rows.length - 1;
@@ -466,27 +471,22 @@ export default function PhotosSimple() {
       if (delErr) throw delErr;
 
       const { data: deletedRows, error: rowDelErr } = await supabase
-  .from("photo_uploads")
-  .delete()
-  .eq("path", currentPath)
-  .select("path");
-
-if (rowDelErr) throw rowDelErr;
-
-// ✅ IMPORTANT: If RLS blocks delete, Supabase can return 0 deleted rows with NO error.
-// Treat that as a failure so we don't "fake delete" in the UI.
-if (!deletedRows || deletedRows.length === 0) {
-  throw new Error(
-    "Delete was blocked by permissions (RLS). You are seeing a local UI delete only. Fix the photo_uploads delete policy."
-  );
-}
+        .from("photo_uploads")
+        .delete()
+        .eq("path", currentPath)
+        .select("path");
 
       if (rowDelErr) throw rowDelErr;
+
+      if (!deletedRows || deletedRows.length === 0) {
+        throw new Error(
+          "Delete was blocked by permissions (RLS). You are seeing a local UI delete only. Fix the photo_uploads delete policy."
+        );
+      }
 
       const newRows = rows.filter((r) => r.path !== currentPath);
       setRows(newRows);
       await refreshList();
-
 
       setConfirmingDelete(false);
 
@@ -549,6 +549,12 @@ if (!deletedRows || deletedRows.length === 0) {
         data={rows}
         keyExtractor={(r) => r.path}
         numColumns={grid.numColumns}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={5}
+        updateCellsBatchingPeriod={50}
+        // ✅ Do NOT enable this on web (it causes mobile Safari issues)
+        removeClippedSubviews={Platform.OS !== "web"}
         columnWrapperStyle={grid.numColumns > 1 ? { gap: grid.gutter } : undefined}
         contentContainerStyle={{ paddingBottom: 24, gap: grid.gutter }}
         // ✅ scroll from anywhere (header is inside the scrollable list)
@@ -558,11 +564,7 @@ if (!deletedRows || deletedRows.length === 0) {
             {!!err && <Text style={styles.err}>{err}</Text>}
 
             <Text style={styles.sub}>
-{userId
-  ? `Signed in ✅ ${(isAdmin || unlockedAdmin) ? "(Admin)" : ""}`
-  : "Not signed in (view-only)"}
-
-
+              {userId ? `Signed in ✅ ${(isAdmin || unlockedAdmin) ? "(Admin)" : ""}` : "Not signed in (view-only)"}
             </Text>
 
             <View style={styles.row}>
