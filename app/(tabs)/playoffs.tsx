@@ -28,6 +28,8 @@ type BracketFormat = "SINGLE" | "DOUBLE";
 
 type ScoreFields = { g1: string; g2: string; g3: string };
 
+type UserSeasonProfileRow = { team_id: string | null; player_name?: string | null };
+
 function asScoreFields(v: any): ScoreFields {
   const g1 = typeof v?.g1 === "string" ? v.g1 : v?.g1 == null ? "" : String(v.g1);
   const g2 = typeof v?.g2 === "string" ? v.g2 : v?.g2 == null ? "" : String(v.g2);
@@ -113,6 +115,9 @@ export default function PlayoffsTab() {
 
   const [divisionPickerOpen, setDivisionPickerOpen] = useState(false);
 
+  // ✅ current user's team for permission checks (non-admin can only confirm their own playoff matches)
+  const [myTeamId, setMyTeamId] = useState<string | null>(null);
+
   const selectedDivisionName = useMemo(() => {
     if (!selectedDivisionId) return "";
     return divisions.find((d) => d.id === selectedDivisionId)?.name ?? "";
@@ -186,6 +191,31 @@ export default function PlayoffsTab() {
 
         const sid = settingsRes.data?.current_season_id ?? null;
         setSeasonId(sid);
+
+        // ✅ identity: figure out myTeamId for current season (used to enable winner picking)
+        try {
+          if (!sid) {
+            setMyTeamId(null);
+          } else {
+            const { data: auth } = await supabase.auth.getUser();
+            const user = auth?.user ?? null;
+            if (!user) {
+              setMyTeamId(null);
+            } else {
+              const profRes = await supabase
+                .from("user_season_profiles")
+                .select("team_id,player_name")
+                .eq("season_id", sid)
+                .eq("user_id", user.id)
+                .maybeSingle();
+
+              const prof = (profRes.data ?? null) as UserSeasonProfileRow | null;
+              setMyTeamId(prof?.team_id ?? null);
+            }
+          }
+        } catch (e) {
+          setMyTeamId(null);
+        }
 
         if (!sid) {
           setSeasonName(null);
@@ -677,6 +707,52 @@ export default function PlayoffsTab() {
     return last[0]?.winnerId ?? null;
   };
 
+  // ✅ Find a match object by gameId, so we can enforce permissions in confirmWinner too
+  const findMatchByGameId = (gameId: string) => {
+    if (!currentBracket) return null;
+    const p = parseGameId(gameId ?? "");
+    if (p.kind === "UNKNOWN") return null;
+
+    if (p.kind === "W") {
+      const w = currentBracket?.winners ?? null;
+      const key = `round${p.roundNum}`;
+      const arr = w ? ((w as any)[key] as any[] | undefined) ?? null : null;
+      if (!Array.isArray(arr)) return null;
+      return arr[p.matchIndex] ?? null;
+    }
+
+    if (p.kind === "L") {
+      const l = currentBracket?.losers ?? null;
+      const key = `round${p.roundNum}`;
+      const arr = l ? ((l as any)[key] as any[] | undefined) ?? null : null;
+      if (!Array.isArray(arr)) return null;
+      return arr[p.matchIndex] ?? null;
+    }
+
+    if (p.kind === "GF") {
+      const f = currentBracket?.finals ?? null;
+      return p.roundNum === 1 ? f?.gf1 ?? null : f?.gf2 ?? null;
+    }
+
+    return null;
+  };
+
+  const canPickWinnerForTeams = (aId: string | null, bId: string | null) => {
+    if (isAdminUnlocked) return true;
+    if (!myTeamId) return false;
+    if (!aId || !bId) return false;
+    return myTeamId === aId || myTeamId === bId;
+  };
+
+  const canPickWinnerForGame = (gameId: string) => {
+    if (isAdminUnlocked) return true;
+    const m = findMatchByGameId(gameId);
+    if (!m) return false;
+    const aId = m?.a?.teamId ?? null;
+    const bId = m?.b?.teamId ?? null;
+    return canPickWinnerForTeams(aId, bId);
+  };
+
   const undoWinner = async (gameId: string) => {
     if (!isAdminUnlocked) return;
     if (!seasonId || !selectedDivisionId) return;
@@ -918,10 +994,12 @@ export default function PlayoffsTab() {
   };
 
   const confirmWinner = async () => {
-    if (!isAdminUnlocked) return;
     if (!seasonId || !selectedDivisionId) return;
     if (!pendingWin) return;
     if (!currentBracket) return;
+
+    // ✅ enforce permissions server-side too (not just UI)
+    if (!canPickWinnerForGame(pendingWin.gameId)) return;
 
     setSavingMode(true);
 
@@ -966,7 +1044,9 @@ export default function PlayoffsTab() {
         const aId = match?.a?.teamId ?? null;
         const bId = match?.b?.teamId ?? null;
 
-        winners[roundKey] = roundArr.map((m: any, idx: number) => (idx !== p.matchIndex ? m : { ...m, winnerId: pendingWin.teamId }));
+        winners[roundKey] = roundArr.map((m: any, idx: number) =>
+          idx !== p.matchIndex ? m : { ...m, winnerId: pendingWin.teamId }
+        );
 
         const nextArr = winners[nextRoundKey] as any[] | undefined;
         if (Array.isArray(nextArr)) {
@@ -1018,7 +1098,9 @@ export default function PlayoffsTab() {
         const roundArr = losers[roundKey] as any[] | undefined;
         if (!Array.isArray(roundArr)) return;
 
-        losers[roundKey] = roundArr.map((m: any, idx: number) => (idx !== p.matchIndex ? m : { ...m, winnerId: pendingWin.teamId }));
+        losers[roundKey] = roundArr.map((m: any, idx: number) =>
+          idx !== p.matchIndex ? m : { ...m, winnerId: pendingWin.teamId }
+        );
 
         const adv = advanceLosersWinner(p.roundNum, p.matchIndex);
         const nextArr = losers[nextRoundKey] as any[] | undefined;
@@ -1329,15 +1411,21 @@ export default function PlayoffsTab() {
                   : "Waiting for finalists"
                 : null;
 
+            const canPickThisMatch = canPickWinnerForTeams(aId, bId);
+
             return (
-              <View key={m?.gameId ?? `${kind}${roundNum}-${idx}`} style={[styles.matchCard, winnerId ? styles.matchCardWinner : null]}>
+              <View
+                key={m?.gameId ?? `${kind}${roundNum}-${idx}`}
+                style={[styles.matchCard, winnerId ? styles.matchCardWinner : null]}
+              >
                 <Text style={styles.matchLabel}>{getMatchLabel(m?.gameId ?? "")}</Text>
 
                 <Pressable
                   style={[styles.matchTeamRow, winnerId && aId && winnerId === aId ? styles.winnerRow : null]}
-                  disabled={!isAdminUnlocked || !aId}
+                  disabled={!canPickThisMatch || !aId}
                   onPress={() => {
                     if (!m?.gameId || !aId) return;
+                    if (!canPickThisMatch) return;
                     setPendingWin({ gameId: m.gameId, teamId: aId });
                   }}
                 >
@@ -1354,9 +1442,10 @@ export default function PlayoffsTab() {
 
                 <Pressable
                   style={[styles.matchTeamRow, winnerId && bId && winnerId === bId ? styles.winnerRow : null]}
-                  disabled={!isAdminUnlocked || !bId}
+                  disabled={!canPickThisMatch || !bId}
                   onPress={() => {
                     if (!m?.gameId || !bId) return;
+                    if (!canPickThisMatch) return;
                     setPendingWin({ gameId: m.gameId, teamId: bId });
                   }}
                 >
@@ -1373,7 +1462,7 @@ export default function PlayoffsTab() {
 
                 {winnerId ? <Text style={{ marginTop: 8, fontWeight: "900", color: "#16a34a" }}>WINNER SELECTED</Text> : null}
 
-                {isAdminUnlocked && pendingWin?.gameId === (m?.gameId ?? "") && (
+                {canPickThisMatch && pendingWin?.gameId === (m?.gameId ?? "") && (
                   <View style={{ marginTop: 10 }}>
                     <Text style={{ fontWeight: "900", marginBottom: 8 }}>Confirm winner?</Text>
 
@@ -1661,7 +1750,9 @@ export default function PlayoffsTab() {
                   ) : !currentBracket ? (
                     <View style={styles.roundColumn}>
                       <Text style={styles.columnTitle}>Bracket</Text>
-                      <Text style={styles.note}>Bracket not created yet. Choose format (Single/Double), then generate the official bracket.</Text>
+                      <Text style={styles.note}>
+                        Bracket not created yet. Choose format (Single/Double), then generate the official bracket.
+                      </Text>
 
                       {isAdminUnlocked && (
                         <Pressable style={styles.lockBtn} onPress={generateBracket} disabled={savingMode}>
