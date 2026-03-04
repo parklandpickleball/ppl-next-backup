@@ -18,6 +18,7 @@ const LOGO = require("../assets/images/icon.png");
 const HERO_BG = require("../assets/images/hero.jpg");
 
 const HEADER_OFFSET = 90;
+const PAYPAL_DUES_URL = "https://www.paypal.com/ncp/payment/LG7NA3X2JFSAN";
 
 export default function Home() {
   const router = useRouter();
@@ -421,7 +422,18 @@ export default function Home() {
                     contact link below.
                   </Text>
                 </View>
+{/* Pay Dues Button */}
+<Pressable
+  onPress={() => window.open(PAYPAL_DUES_URL, "_blank")}
+  style={styles.payDuesBtn}
+>
+  <Text style={styles.payDuesBtnText}>Pay League Dues →</Text>
+</Pressable>
 
+<Text style={styles.payDuesNote}>
+  You will enter the correct amount at checkout (team, individual, discounts, or
+  paying for a teammate).
+</Text>
                 {/* Contact Card */}
                 <Pressable
                   onPress={() =>
@@ -1359,6 +1371,36 @@ const styles = StyleSheet.create({
     transitionDuration: "160ms" as any,
     transitionTimingFunction: "ease-out" as any,
   } as any,
+  payDuesBtn: {
+  marginTop: 26,
+  width: "100%",
+  maxWidth: 600,
+  alignSelf: "center",
+  backgroundColor: "#0070BA",
+  borderRadius: 18,
+  paddingVertical: 18,
+  paddingHorizontal: 28,
+  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)" as any,
+  cursor: "pointer" as any,
+  alignItems: "center",
+} as any,
+
+payDuesBtnText: {
+  fontSize: 18,
+  fontWeight: "900",
+  letterSpacing: 1.6,
+  color: "#FFFFFF",
+  textAlign: "center",
+} as any,
+
+payDuesNote: {
+  marginTop: 10,
+  fontSize: 13,
+  lineHeight: 20,
+  color: "#475569",
+  maxWidth: 860,
+  textAlign: "center",
+} as any,
 
   membershipCardTitle: {
     fontSize: 18,
