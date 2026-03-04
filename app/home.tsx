@@ -170,6 +170,7 @@ export default function Home() {
                 <Pressable
                   onPress={() => setMobileMenuOpen(true)}
                   style={styles.hamburgerBtn}
+                  hitSlop={12}
                 >
                   <Text style={styles.hamburgerText}>☰</Text>
                 </Pressable>
@@ -679,7 +680,15 @@ function InfoCard({ title, body }: { title: string; body: string }) {
   );
 }
 
-function SponsorCard({ name, url, logo }: { name: string; url: string; logo: any }) {
+function SponsorCard({
+  name,
+  url,
+  logo,
+}: {
+  name: string;
+  url: string;
+  logo: any;
+}) {
   return (
     <Pressable
       onPress={() => window.open(url, "_blank")}
@@ -705,7 +714,9 @@ function GalleryTile({ uri, onPress }: { uri: string; onPress: () => void }) {
         resizeMode="cover"
         style={styles.galleryImgFill as any}
       />
-      <View style={[styles.galleryOverlay, hovered && styles.galleryOverlayHover]}>
+      <View
+        style={[styles.galleryOverlay, hovered && styles.galleryOverlayHover]}
+      >
         <Text style={styles.galleryOverlayText}>VIEW</Text>
       </View>
     </Pressable>
@@ -845,8 +856,9 @@ const styles = StyleSheet.create({
   } as any,
 
   // ✅ MOBILE TOP BAR (MOBILE WEB ONLY)
+  // FIX: Use "fixed" + huge zIndex so the hamburger cannot be hidden on iPhone portrait
   mobileTopBar: {
-    position: "absolute" as any,
+    position: "fixed" as any,
     top: 0,
     left: 0,
     right: 0,
@@ -856,7 +868,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    zIndex: 50 as any,
+    zIndex: 999999 as any,
+    backgroundColor: "rgba(11,18,32,0.30)" as any,
+    backdropFilter: "blur(6px)" as any,
+    pointerEvents: "auto" as any,
   } as any,
 
   mobileTopLogo: {
@@ -865,16 +880,20 @@ const styles = StyleSheet.create({
   } as any,
 
   // ✅ HAMBURGER + MENU
+  // FIX: Ensure button sits above everything + has enough contrast on portrait
   hamburgerBtn: {
     width: 52,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.14)" as any,
+    backgroundColor: "rgba(255,255,255,0.28)" as any,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.22)" as any,
+    borderColor: "rgba(255,255,255,0.34)" as any,
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer" as any,
+    position: "relative" as any,
+    zIndex: 999999 as any,
+    boxShadow: "0 10px 26px rgba(0,0,0,0.38)" as any,
   } as any,
 
   hamburgerText: {
