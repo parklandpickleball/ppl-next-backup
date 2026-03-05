@@ -76,12 +76,16 @@ export default function PhotosSimple() {
   const [viewerIndex, setViewerIndex] = useState<number>(-1);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  // ✅ used for Android/Web manual zoom + to reflect iOS zoomScale
   const [zoom, setZoom] = useState<number>(1);
 
   const folderPrefix = SHARED_FOLDER;
 
   // Prevent stacked refreshes on web focus / double triggers
   const refreshInFlight = useRef(false);
+
+  // ✅ iOS pinch zoom: track current zoomScale so swipe logic knows when to disable
+  const iosZoomRef = useRef(1);
 
   const grid = useMemo(() => {
     const gutter = 10;
@@ -234,6 +238,7 @@ export default function PhotosSimple() {
       setViewerOpen(false);
       setViewerIndex(-1);
       setZoom(1);
+      iosZoomRef.current = 1;
 
       const first = await fetchPage(0);
       setRows(first);
@@ -414,6 +419,7 @@ export default function PhotosSimple() {
     setViewerOpen(true);
     setConfirmingDelete(false);
     setZoom(1);
+    iosZoomRef.current = 1;
   }
 
   function closeViewer() {
@@ -421,6 +427,7 @@ export default function PhotosSimple() {
     setViewerIndex(-1);
     setConfirmingDelete(false);
     setZoom(1);
+    iosZoomRef.current = 1;
   }
 
   const currentRow = useMemo(() => {
@@ -467,18 +474,35 @@ export default function PhotosSimple() {
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_evt, gesture) => {
+      onMoveShouldSetPanResponder: (evt, gesture) => {
         if (!viewerOpen) return false;
-        if (zoom !== 1) return false;
+
+        // ✅ DO NOT capture 2-finger gestures (pinch)
+        const touches = (evt as any)?.nativeEvent?.touches?.length ?? 0;
+        if (touches >= 2) return false;
+
+        // ✅ Disable swipe when zoomed (iOS pinch or manual zoom)
+        const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
+        if (z !== 1) return false;
+
         return Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 12;
       },
-      onMoveShouldSetPanResponderCapture: (_evt, gesture) => {
+      onMoveShouldSetPanResponderCapture: (evt, gesture) => {
         if (!viewerOpen) return false;
-        if (zoom !== 1) return false;
+
+        // ✅ DO NOT capture 2-finger gestures (pinch)
+        const touches = (evt as any)?.nativeEvent?.touches?.length ?? 0;
+        if (touches >= 2) return false;
+
+        // ✅ Disable swipe when zoomed (iOS pinch or manual zoom)
+        const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
+        if (z !== 1) return false;
+
         return Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 12;
       },
       onPanResponderRelease: (_evt, gesture) => {
-        if (zoom !== 1) return;
+        const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
+        if (z !== 1) return;
 
         const SWIPE_THRESHOLD = 60;
         if (gesture.dx > SWIPE_THRESHOLD) {
@@ -542,6 +566,7 @@ export default function PhotosSimple() {
   }
   function resetZoom() {
     setZoom(1);
+    iosZoomRef.current = 1;
   }
 
   const viewerHeight = useMemo(() => {
@@ -622,6 +647,7 @@ export default function PhotosSimple() {
             <Text style={styles.sub}>
               Viewer: use <Text style={{ fontWeight: "800" }}>← →</Text> (desktop) or swipe (mobile).
             </Text>
+            {Platform.OS === "ios" && <Text style={styles.sub}>Pinch-to-zoom is enabled on iOS ✅</Text>}
           </View>
         }
         renderItem={({ item, index }) => {
@@ -689,13 +715,13 @@ export default function PhotosSimple() {
                   <Text style={styles.actionText}>Next</Text>
                 </Pressable>
 
-                <Pressable style={[styles.actionBtn, zoom <= 1 && styles.btnDisabled]} onPress={zoomOut} disabled={zoom <= 1}>
+                <Pressable style={[styles.actionBtn, (Platform.OS === "ios" ? iosZoomRef.current <= 1 : zoom <= 1) && styles.btnDisabled]} onPress={zoomOut} disabled={Platform.OS === "ios" ? iosZoomRef.current <= 1 : zoom <= 1}>
                   <Text style={styles.actionText}>Zoom −</Text>
                 </Pressable>
-                <Pressable style={[styles.actionBtn, zoom >= 4 && styles.btnDisabled]} onPress={zoomIn} disabled={zoom >= 4}>
+                <Pressable style={[styles.actionBtn, (Platform.OS === "ios" ? iosZoomRef.current >= 4 : zoom >= 4) && styles.btnDisabled]} onPress={zoomIn} disabled={Platform.OS === "ios" ? iosZoomRef.current >= 4 : zoom >= 4}>
                   <Text style={styles.actionText}>Zoom +</Text>
                 </Pressable>
-                <Pressable style={[styles.actionBtn, zoom === 1 && styles.btnDisabled]} onPress={resetZoom} disabled={zoom === 1}>
+                <Pressable style={[styles.actionBtn, (Platform.OS === "ios" ? iosZoomRef.current === 1 : zoom === 1) && styles.btnDisabled]} onPress={resetZoom} disabled={Platform.OS === "ios" ? iosZoomRef.current === 1 : zoom === 1}>
                   <Text style={styles.actionText}>Reset</Text>
                 </Pressable>
 
@@ -717,18 +743,36 @@ export default function PhotosSimple() {
                   <ScrollView
                     style={{ flex: 1 }}
                     contentContainerStyle={{ alignItems: "center", justifyContent: "center", backgroundColor: "#000" }}
+                    // ✅ iOS native pinch zoom
                     maximumZoomScale={Platform.OS === "ios" ? 4 : undefined}
                     minimumZoomScale={Platform.OS === "ios" ? 1 : undefined}
+                    pinchGestureEnabled={Platform.OS === "ios" ? true : undefined}
                     bounces={false}
                     showsHorizontalScrollIndicator={false}
                     showsVerticalScrollIndicator={false}
-                    scrollEnabled={zoom > 1}
+                    // ✅ On iOS, always allow scroll/zoom gestures; on Android/Web, only scroll when zoomed
+                    scrollEnabled={Platform.OS === "ios" ? true : zoom > 1}
+                    // ✅ keep our zoom state in sync with iOS pinch zoomScale
+                    onScroll={(e: any) => {
+                      if (Platform.OS !== "ios") return;
+                      const zs = Number(e?.nativeEvent?.zoomScale ?? 1);
+                      if (!Number.isFinite(zs)) return;
+                      iosZoomRef.current = zs;
+                      // keep the button state reflecting pinch zoom
+                      setZoom(zs);
+                    }}
+                    scrollEventThrottle={16}
                   >
                     <View style={{ width: width, height: viewerHeight, alignItems: "center", justifyContent: "center" }}>
                       <Image
                         source={{ uri: currentUrl }}
                         resizeMode="contain"
-                        style={{ width: width, height: viewerHeight, transform: [{ scale: zoom }] }}
+                        style={{
+                          width: width,
+                          height: viewerHeight,
+                          // ✅ Only use manual scaling on non-iOS (Android/Web)
+                          ...(Platform.OS === "ios" ? {} : { transform: [{ scale: zoom }] }),
+                        }}
                       />
                     </View>
                   </ScrollView>
