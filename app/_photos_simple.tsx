@@ -524,6 +524,7 @@ export default function PhotosSimple() {
     })
   ).current;
 
+  // ✅ FIXED DELETE: verify session at delete-time + delete DB row first
   async function doDeleteNow() {
     if (!currentRow || !currentPath) return;
 
@@ -531,9 +532,16 @@ export default function PhotosSimple() {
       setBusy(true);
       setErr("");
 
-      const { error: delErr } = await supabase.storage.from(BUCKET).remove([currentPath]);
-      if (delErr) throw delErr;
+      // ✅ PROVE we are authenticated RIGHT NOW (not just earlier during init)
+      const { data: s, error: sErr } = await supabase.auth.getSession();
+      if (sErr) throw sErr;
 
+      const authedUserId = s.session?.user?.id ?? "";
+      if (!authedUserId) {
+        throw new Error("Not authenticated at delete time. Click 'Sign in (Guest)' and try again.");
+      }
+
+      // ✅ Delete DB row first (RLS enforces uploader/admin)
       const { data: deletedRows, error: rowDelErr } = await supabase
         .from("photo_uploads")
         .delete()
@@ -543,8 +551,12 @@ export default function PhotosSimple() {
       if (rowDelErr) throw rowDelErr;
 
       if (!deletedRows || deletedRows.length === 0) {
-        throw new Error("Delete was blocked by permissions (RLS). Fix the photo_uploads delete policy.");
+        throw new Error("Delete was blocked by permissions (RLS) on photo_uploads.");
       }
+
+      // ✅ Now delete the storage object
+      const { error: delErr } = await supabase.storage.from(BUCKET).remove([currentPath]);
+      if (delErr) throw delErr;
 
       const newRows = rows.filter((r) => r.path !== currentPath);
       setRows(newRows);
