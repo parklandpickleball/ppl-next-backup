@@ -87,6 +87,14 @@ export default function PhotosSimple() {
   // ✅ iOS pinch zoom: track current zoomScale so swipe logic knows when to disable
   const iosZoomRef = useRef(1);
 
+  // ✅ viewer size measured from the actual modal content (fixes iOS Safari web clipping)
+  const [viewerW, setViewerW] = useState<number>(0);
+  const [viewerH, setViewerH] = useState<number>(0);
+
+  // ✅ web pinch state (more reliable than PanResponder on iOS Safari web)
+  const webPinchStartDist = useRef<number | null>(null);
+  const webPinchStartZoom = useRef<number>(1);
+
   const grid = useMemo(() => {
     const gutter = 10;
     const available = Math.max(320, width - 24);
@@ -420,6 +428,8 @@ export default function PhotosSimple() {
     setConfirmingDelete(false);
     setZoom(1);
     iosZoomRef.current = 1;
+    webPinchStartDist.current = null;
+    webPinchStartZoom.current = 1;
   }
 
   function closeViewer() {
@@ -428,6 +438,8 @@ export default function PhotosSimple() {
     setConfirmingDelete(false);
     setZoom(1);
     iosZoomRef.current = 1;
+    webPinchStartDist.current = null;
+    webPinchStartZoom.current = 1;
   }
 
   const currentRow = useMemo(() => {
@@ -472,86 +484,33 @@ export default function PhotosSimple() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerOpen, viewerIndex, hasPrev, hasNext]);
 
-    const pinchStartDistRef = useRef<number | null>(null);
-  const pinchStartZoomRef = useRef<number>(1);
-
-  function getTouchDist(evt: any) {
-    const t = evt?.nativeEvent?.touches;
-    if (!t || t.length < 2) return null;
-    const dx = (t[0].pageX ?? 0) - (t[1].pageX ?? 0);
-    const dy = (t[0].pageY ?? 0) - (t[1].pageY ?? 0);
-    return Math.sqrt(dx * dx + dy * dy);
-  }
-
+  // ✅ Swipe left/right (1 finger) ONLY when not zoomed.
+  // Pinch zoom on web is handled by onTouchMove below (not PanResponder).
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gesture) => {
         if (!viewerOpen) return false;
 
         const touches = (evt as any)?.nativeEvent?.touches?.length ?? 0;
+        if (touches >= 2) return false;
 
-        // ✅ On Android/Web: allow 2-finger pinch to control zoom ourselves
-        if ((Platform.OS === "web" || Platform.OS === "android") && touches >= 2) {
-          return true;
-        }
-
-        // ✅ iOS pinch zoom is handled by ScrollView; DO NOT capture 2-finger gestures there
-        if (Platform.OS === "ios" && touches >= 2) return false;
-
-        // ✅ Disable swipe when zoomed (iOS pinch or manual zoom)
         const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
         if (z !== 1) return false;
 
         return Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 12;
       },
-
       onMoveShouldSetPanResponderCapture: (evt, gesture) => {
         if (!viewerOpen) return false;
 
         const touches = (evt as any)?.nativeEvent?.touches?.length ?? 0;
+        if (touches >= 2) return false;
 
-        // ✅ On Android/Web: allow 2-finger pinch to control zoom ourselves
-        if ((Platform.OS === "web" || Platform.OS === "android") && touches >= 2) {
-          return true;
-        }
-
-        // ✅ iOS pinch zoom is handled by ScrollView; DO NOT capture 2-finger gestures there
-        if (Platform.OS === "ios" && touches >= 2) return false;
-
-        // ✅ Disable swipe when zoomed (iOS pinch or manual zoom)
         const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
         if (z !== 1) return false;
 
         return Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 12;
       },
-
-      onPanResponderGrant: (evt) => {
-        // ✅ Initialize pinch tracking for Android/Web
-        if (Platform.OS === "web" || Platform.OS === "android") {
-          const dist = getTouchDist(evt as any);
-          if (dist != null) {
-            pinchStartDistRef.current = dist;
-            pinchStartZoomRef.current = zoom;
-          }
-        }
-      },
-
-      onPanResponderMove: (evt) => {
-        // ✅ Handle pinch zoom on Android/Web
-        if (Platform.OS === "web" || Platform.OS === "android") {
-          const dist = getTouchDist(evt as any);
-          if (dist != null && pinchStartDistRef.current != null) {
-            const ratio = dist / pinchStartDistRef.current;
-            const next = Math.max(1, Math.min(4, pinchStartZoomRef.current * ratio));
-            setZoom(Number(next.toFixed(3)));
-          }
-        }
-      },
-
       onPanResponderRelease: (_evt, gesture) => {
-        // ✅ Reset pinch refs
-        pinchStartDistRef.current = null;
-
         const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
         if (z !== 1) return;
 
@@ -561,11 +520,6 @@ export default function PhotosSimple() {
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
           if (hasNext) openViewerByIndex(viewerIndex + 1);
         }
-      },
-
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderTerminate: () => {
-        pinchStartDistRef.current = null;
       },
     })
   ).current;
@@ -623,9 +577,21 @@ export default function PhotosSimple() {
   function resetZoom() {
     setZoom(1);
     iosZoomRef.current = 1;
+    webPinchStartDist.current = null;
+    webPinchStartZoom.current = 1;
   }
 
-  const viewerHeight = useMemo(() => {
+  // ✅ web pinch helpers
+  function touchDistFromTouches(touches: any[]) {
+    if (!touches || touches.length < 2) return null;
+    const a = touches[0];
+    const b = touches[1];
+    const dx = (a.pageX ?? 0) - (b.pageX ?? 0);
+    const dy = (a.pageY ?? 0) - (b.pageY ?? 0);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  const viewerHeightFallback = useMemo(() => {
     const usable = Math.max(260, height - 220);
     return usable;
   }, [height]);
@@ -704,6 +670,7 @@ export default function PhotosSimple() {
               Viewer: use <Text style={{ fontWeight: "800" }}>← →</Text> (desktop) or swipe (mobile).
             </Text>
             {Platform.OS === "ios" && <Text style={styles.sub}>Pinch-to-zoom is enabled on iOS ✅</Text>}
+            {Platform.OS === "web" && <Text style={styles.sub}>Tip: on mobile web, pinch zoom works inside the viewer ✅</Text>}
           </View>
         }
         renderItem={({ item, index }) => {
@@ -747,8 +714,8 @@ export default function PhotosSimple() {
       />
 
       <Modal visible={viewerOpen} animationType="fade" transparent onRequestClose={closeViewer} presentationStyle="overFullScreen">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <View style={[styles.modalBackdrop, Platform.OS === "web" ? styles.modalBackdropWeb : null]}>
+          <View style={[styles.modalCard, Platform.OS === "web" ? styles.modalCardWeb : null]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle} numberOfLines={1}>
                 {currentName}
@@ -771,18 +738,45 @@ export default function PhotosSimple() {
                   <Text style={styles.actionText}>Next</Text>
                 </Pressable>
 
-                <Pressable style={[styles.actionBtn, (Platform.OS === "ios" ? iosZoomRef.current <= 1 : zoom <= 1) && styles.btnDisabled]} onPress={zoomOut} disabled={Platform.OS === "ios" ? iosZoomRef.current <= 1 : zoom <= 1}>
+                <Pressable
+                  style={[
+                    styles.actionBtn,
+                    (Platform.OS === "ios" ? iosZoomRef.current <= 1 : zoom <= 1) && styles.btnDisabled,
+                  ]}
+                  onPress={zoomOut}
+                  disabled={Platform.OS === "ios" ? iosZoomRef.current <= 1 : zoom <= 1}
+                >
                   <Text style={styles.actionText}>Zoom −</Text>
                 </Pressable>
-                <Pressable style={[styles.actionBtn, (Platform.OS === "ios" ? iosZoomRef.current >= 4 : zoom >= 4) && styles.btnDisabled]} onPress={zoomIn} disabled={Platform.OS === "ios" ? iosZoomRef.current >= 4 : zoom >= 4}>
+
+                <Pressable
+                  style={[
+                    styles.actionBtn,
+                    (Platform.OS === "ios" ? iosZoomRef.current >= 4 : zoom >= 4) && styles.btnDisabled,
+                  ]}
+                  onPress={zoomIn}
+                  disabled={Platform.OS === "ios" ? iosZoomRef.current >= 4 : zoom >= 4}
+                >
                   <Text style={styles.actionText}>Zoom +</Text>
                 </Pressable>
-                <Pressable style={[styles.actionBtn, (Platform.OS === "ios" ? iosZoomRef.current === 1 : zoom === 1) && styles.btnDisabled]} onPress={resetZoom} disabled={Platform.OS === "ios" ? iosZoomRef.current === 1 : zoom === 1}>
+
+                <Pressable
+                  style={[
+                    styles.actionBtn,
+                    (Platform.OS === "ios" ? iosZoomRef.current === 1 : zoom === 1) && styles.btnDisabled,
+                  ]}
+                  onPress={resetZoom}
+                  disabled={Platform.OS === "ios" ? iosZoomRef.current === 1 : zoom === 1}
+                >
                   <Text style={styles.actionText}>Reset</Text>
                 </Pressable>
 
                 {canDeleteCurrent && !confirmingDelete && (
-                  <Pressable style={[styles.actionBtn, styles.deleteBtn, busy && styles.btnDisabled]} onPress={() => setConfirmingDelete(true)} disabled={busy}>
+                  <Pressable
+                    style={[styles.actionBtn, styles.deleteBtn, busy && styles.btnDisabled]}
+                    onPress={() => setConfirmingDelete(true)}
+                    disabled={busy}
+                  >
                     <Text style={styles.actionText}>Delete</Text>
                   </Pressable>
                 )}
@@ -795,10 +789,51 @@ export default function PhotosSimple() {
 
             {!!currentUrl && (
               <View style={{ flex: 1 }}>
-                <View style={{ flex: 1 }} {...panResponder.panHandlers}>
+                <View
+                  style={{ flex: 1 }}
+                  {...panResponder.panHandlers}
+                  onLayout={(e) => {
+                    const w = Math.floor(e.nativeEvent.layout.width);
+                    const h = Math.floor(e.nativeEvent.layout.height);
+                    if (w > 0) setViewerW(w);
+                    if (h > 0) setViewerH(h);
+                  }}
+                  onTouchStart={(e: any) => {
+                    if (Platform.OS !== "web") return;
+                    const touches = e?.nativeEvent?.touches ?? [];
+                    if (touches.length >= 2) {
+                      const d = touchDistFromTouches(touches);
+                      if (d != null) {
+                        webPinchStartDist.current = d;
+                        webPinchStartZoom.current = zoom;
+                      }
+                    }
+                  }}
+                  onTouchMove={(e: any) => {
+                    if (Platform.OS !== "web") return;
+                    const touches = e?.nativeEvent?.touches ?? [];
+                    if (touches.length >= 2 && webPinchStartDist.current != null) {
+                      const d = touchDistFromTouches(touches);
+                      if (d != null && webPinchStartDist.current > 0) {
+                        const ratio = d / webPinchStartDist.current;
+                        const next = Math.max(1, Math.min(4, webPinchStartZoom.current * ratio));
+                        setZoom(Number(next.toFixed(3)));
+                      }
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    if (Platform.OS !== "web") return;
+                    webPinchStartDist.current = null;
+                  }}
+                >
                   <ScrollView
                     style={{ flex: 1 }}
-                    contentContainerStyle={{ alignItems: "center", justifyContent: "center", backgroundColor: "#000" }}
+                    contentContainerStyle={{
+                      alignItems: "center",
+                      justifyContent: "center",
+                      backgroundColor: "#000",
+                      flexGrow: 1,
+                    }}
                     // ✅ iOS native pinch zoom
                     maximumZoomScale={Platform.OS === "ios" ? 4 : undefined}
                     minimumZoomScale={Platform.OS === "ios" ? 1 : undefined}
@@ -814,19 +849,24 @@ export default function PhotosSimple() {
                       const zs = Number(e?.nativeEvent?.zoomScale ?? 1);
                       if (!Number.isFinite(zs)) return;
                       iosZoomRef.current = zs;
-                      // keep the button state reflecting pinch zoom
                       setZoom(zs);
                     }}
                     scrollEventThrottle={16}
                   >
-                    <View style={{ width: width, height: viewerHeight, alignItems: "center", justifyContent: "center" }}>
+                    <View
+                      style={{
+                        width: viewerW > 0 ? viewerW : width,
+                        height: viewerH > 0 ? viewerH : viewerHeightFallback,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
                       <Image
                         source={{ uri: currentUrl }}
                         resizeMode="contain"
                         style={{
-                          width: width,
-                          height: viewerHeight,
-                          // ✅ Only use manual scaling on non-iOS (Android/Web)
+                          width: viewerW > 0 ? viewerW : width,
+                          height: viewerH > 0 ? viewerH : viewerHeightFallback,
                           ...(Platform.OS === "ios" ? {} : { transform: [{ scale: zoom }] }),
                         }}
                       />
@@ -840,10 +880,18 @@ export default function PhotosSimple() {
               <View style={styles.confirmBar}>
                 <Text style={styles.confirmText}>Confirm delete?</Text>
                 <View style={{ flexDirection: "row", gap: 10 }}>
-                  <Pressable style={[styles.actionBtn, styles.cancelBtn, busy && styles.btnDisabled]} onPress={() => setConfirmingDelete(false)} disabled={busy}>
+                  <Pressable
+                    style={[styles.actionBtn, styles.cancelBtn, busy && styles.btnDisabled]}
+                    onPress={() => setConfirmingDelete(false)}
+                    disabled={busy}
+                  >
                     <Text style={styles.actionText}>Cancel</Text>
                   </Pressable>
-                  <Pressable style={[styles.actionBtn, styles.deleteBtn, busy && styles.btnDisabled]} onPress={doDeleteNow} disabled={busy}>
+                  <Pressable
+                    style={[styles.actionBtn, styles.deleteBtn, busy && styles.btnDisabled]}
+                    onPress={doDeleteNow}
+                    disabled={busy}
+                  >
                     <Text style={styles.actionText}>Confirm Delete</Text>
                   </Pressable>
                 </View>
@@ -876,7 +924,11 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
 
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.75)", padding: 12, justifyContent: "center" },
+  modalBackdropWeb: { padding: 0, justifyContent: "flex-start" },
+
   modalCard: { backgroundColor: "#fff", borderRadius: 14, overflow: "hidden", maxHeight: "95%", flex: 1 },
+  modalCardWeb: { borderRadius: 0, maxHeight: "100%", height: "100%", width: "100%" },
+
   modalHeader: {
     paddingHorizontal: 12,
     paddingVertical: 10,
