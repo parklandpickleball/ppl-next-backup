@@ -472,14 +472,31 @@ export default function PhotosSimple() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewerOpen, viewerIndex, hasPrev, hasNext]);
 
+    const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef<number>(1);
+
+  function getTouchDist(evt: any) {
+    const t = evt?.nativeEvent?.touches;
+    if (!t || t.length < 2) return null;
+    const dx = (t[0].pageX ?? 0) - (t[1].pageX ?? 0);
+    const dy = (t[0].pageY ?? 0) - (t[1].pageY ?? 0);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (evt, gesture) => {
         if (!viewerOpen) return false;
 
-        // ✅ DO NOT capture 2-finger gestures (pinch)
         const touches = (evt as any)?.nativeEvent?.touches?.length ?? 0;
-        if (touches >= 2) return false;
+
+        // ✅ On Android/Web: allow 2-finger pinch to control zoom ourselves
+        if ((Platform.OS === "web" || Platform.OS === "android") && touches >= 2) {
+          return true;
+        }
+
+        // ✅ iOS pinch zoom is handled by ScrollView; DO NOT capture 2-finger gestures there
+        if (Platform.OS === "ios" && touches >= 2) return false;
 
         // ✅ Disable swipe when zoomed (iOS pinch or manual zoom)
         const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
@@ -487,12 +504,19 @@ export default function PhotosSimple() {
 
         return Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 12;
       },
+
       onMoveShouldSetPanResponderCapture: (evt, gesture) => {
         if (!viewerOpen) return false;
 
-        // ✅ DO NOT capture 2-finger gestures (pinch)
         const touches = (evt as any)?.nativeEvent?.touches?.length ?? 0;
-        if (touches >= 2) return false;
+
+        // ✅ On Android/Web: allow 2-finger pinch to control zoom ourselves
+        if ((Platform.OS === "web" || Platform.OS === "android") && touches >= 2) {
+          return true;
+        }
+
+        // ✅ iOS pinch zoom is handled by ScrollView; DO NOT capture 2-finger gestures there
+        if (Platform.OS === "ios" && touches >= 2) return false;
 
         // ✅ Disable swipe when zoomed (iOS pinch or manual zoom)
         const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
@@ -500,7 +524,34 @@ export default function PhotosSimple() {
 
         return Math.abs(gesture.dx) > Math.abs(gesture.dy) && Math.abs(gesture.dx) > 12;
       },
+
+      onPanResponderGrant: (evt) => {
+        // ✅ Initialize pinch tracking for Android/Web
+        if (Platform.OS === "web" || Platform.OS === "android") {
+          const dist = getTouchDist(evt as any);
+          if (dist != null) {
+            pinchStartDistRef.current = dist;
+            pinchStartZoomRef.current = zoom;
+          }
+        }
+      },
+
+      onPanResponderMove: (evt) => {
+        // ✅ Handle pinch zoom on Android/Web
+        if (Platform.OS === "web" || Platform.OS === "android") {
+          const dist = getTouchDist(evt as any);
+          if (dist != null && pinchStartDistRef.current != null) {
+            const ratio = dist / pinchStartDistRef.current;
+            const next = Math.max(1, Math.min(4, pinchStartZoomRef.current * ratio));
+            setZoom(Number(next.toFixed(3)));
+          }
+        }
+      },
+
       onPanResponderRelease: (_evt, gesture) => {
+        // ✅ Reset pinch refs
+        pinchStartDistRef.current = null;
+
         const z = Platform.OS === "ios" ? iosZoomRef.current : zoom;
         if (z !== 1) return;
 
@@ -510,6 +561,11 @@ export default function PhotosSimple() {
         } else if (gesture.dx < -SWIPE_THRESHOLD) {
           if (hasNext) openViewerByIndex(viewerIndex + 1);
         }
+      },
+
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderTerminate: () => {
+        pinchStartDistRef.current = null;
       },
     })
   ).current;
