@@ -112,6 +112,7 @@ export default function PlayoffsTab() {
   const [pendingWin, setPendingWin] = useState<{ gameId: string; teamId: string } | null>(null);
 
   const [divisionPickerOpen, setDivisionPickerOpen] = useState(false);
+  const [myTeamId, setMyTeamId] = useState<string | null>(null);
 
   const selectedDivisionName = useMemo(() => {
     if (!selectedDivisionId) return "";
@@ -173,6 +174,68 @@ export default function PlayoffsTab() {
     return b ?? null;
   }, [selectedBoard]);
 
+  const getMatchFromBracket = useCallback(
+    (gameId: string) => {
+      if (!currentBracket) return null;
+
+      const p = parseGameId(gameId);
+      if (p.kind === "UNKNOWN") return null;
+
+      if (p.kind === "W") {
+        const arr = currentBracket?.winners?.[`round${p.roundNum}`];
+        return Array.isArray(arr) ? arr[p.matchIndex] ?? null : null;
+      }
+
+      if (p.kind === "L") {
+        const arr = currentBracket?.losers?.[`round${p.roundNum}`];
+        return Array.isArray(arr) ? arr[p.matchIndex] ?? null : null;
+      }
+
+      if (p.kind === "GF") {
+        return p.roundNum === 1 ? currentBracket?.finals?.gf1 ?? null : currentBracket?.finals?.gf2 ?? null;
+      }
+
+      return null;
+    },
+    [currentBracket]
+  );
+
+  const canUserTouchMatch = useCallback(
+    (gameId: string) => {
+      if (isAdminUnlocked) return true;
+      if (!myTeamId) return false;
+
+      const match = getMatchFromBracket(gameId);
+      if (!match) return false;
+
+      const aId = match?.a?.teamId ?? null;
+      const bId = match?.b?.teamId ?? null;
+
+      return aId === myTeamId || bId === myTeamId;
+    },
+    [getMatchFromBracket, isAdminUnlocked, myTeamId]
+  );
+
+  const canUserPickTeam = useCallback(
+    (gameId: string, teamId: string | null) => {
+      if (!teamId) return false;
+      if (isAdminUnlocked) return true;
+      if (!myTeamId) return false;
+
+      const match = getMatchFromBracket(gameId);
+      if (!match) return false;
+
+      const aId = match?.a?.teamId ?? null;
+      const bId = match?.b?.teamId ?? null;
+
+      const userIsInMatch = aId === myTeamId || bId === myTeamId;
+      if (!userIsInMatch) return false;
+
+      return teamId === aId || teamId === bId;
+    },
+    [getMatchFromBracket, isAdminUnlocked, myTeamId]
+  );
+
   const load = useCallback(
     async (overrideDivisionId?: string | null) => {
       try {
@@ -193,11 +256,34 @@ export default function PlayoffsTab() {
           setBoardsByDivision({});
           setSelectedDivisionId(null);
           setTeams([]);
+          setMyTeamId(null);
           return;
         }
 
         const seasonRes = await supabase.from("seasons").select("name").eq("id", sid).maybeSingle();
         setSeasonName(seasonRes.data?.name ?? null);
+
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user?.id) {
+          const profileRes = await supabase
+            .from("user_season_profiles")
+            .select("team_id")
+            .eq("user_id", user.id)
+            .eq("season_id", sid)
+            .maybeSingle();
+
+          if (profileRes.error) {
+            console.log("user_season_profiles load error:", profileRes.error.message);
+            setMyTeamId(null);
+          } else {
+            setMyTeamId(profileRes.data?.team_id ?? null);
+          }
+        } else {
+          setMyTeamId(null);
+        }
 
         const divRes = await supabase.from("divisions").select("id,name").eq("season_id", sid).order("name");
         const divs = (divRes.data ?? []) as DivisionRow[];
@@ -368,28 +454,28 @@ export default function PlayoffsTab() {
                     }
 
                     // ✅ Standings-style: count results for the teams that are in THIS division,
-// even if the opponent is outside the division.
-const aIn = !!stats[aId];
-const bIn = !!stats[bId];
+                    // even if the opponent is outside the division.
+                    const aIn = !!stats[aId];
+                    const bIn = !!stats[bId];
 
-// if neither team is in this division, ignore
-if (!aIn && !bIn) continue;
+                    // if neither team is in this division, ignore
+                    if (!aIn && !bIn) continue;
 
-if (aIn) {
-  stats[aId].gamesPlayed += 1;
-  stats[aId].pointsFor += ap;
-  stats[aId].pointsAgainst += bp;
-  if (ap > bp) stats[aId].wins += 1;
-  else if (bp > ap) stats[aId].losses += 1;
-}
+                    if (aIn) {
+                      stats[aId].gamesPlayed += 1;
+                      stats[aId].pointsFor += ap;
+                      stats[aId].pointsAgainst += bp;
+                      if (ap > bp) stats[aId].wins += 1;
+                      else if (bp > ap) stats[aId].losses += 1;
+                    }
 
-if (bIn) {
-  stats[bId].gamesPlayed += 1;
-  stats[bId].pointsFor += bp;
-  stats[bId].pointsAgainst += ap;
-  if (bp > ap) stats[bId].wins += 1;
-  else if (ap > bp) stats[bId].losses += 1;
-}
+                    if (bIn) {
+                      stats[bId].gamesPlayed += 1;
+                      stats[bId].pointsFor += bp;
+                      stats[bId].pointsAgainst += ap;
+                      if (bp > ap) stats[bId].wins += 1;
+                      else if (ap > bp) stats[bId].losses += 1;
+                    }
                   }
                 }
 
@@ -922,10 +1008,10 @@ if (bIn) {
   };
 
   const confirmWinner = async () => {
-    if (!isAdminUnlocked) return;
     if (!seasonId || !selectedDivisionId) return;
     if (!pendingWin) return;
     if (!currentBracket) return;
+    if (!canUserPickTeam(pendingWin.gameId, pendingWin.teamId)) return;
 
     setSavingMode(true);
 
@@ -1315,6 +1401,7 @@ if (bIn) {
             const aId = m?.a?.teamId ?? null;
             const bId = m?.b?.teamId ?? null;
             const winnerId = m?.winnerId ?? null;
+            const gameId = m?.gameId ?? "";
 
             const aName =
               kind === "W" && roundNum === 1 ? getTeamDisplayName(aId, "BYE") : getTeamDisplayName(aId, "TBD");
@@ -1333,15 +1420,20 @@ if (bIn) {
                   : "Waiting for finalists"
                 : null;
 
+            const canTouchThisMatch = canUserTouchMatch(gameId);
+            const canPickA = canUserPickTeam(gameId, aId);
+            const canPickB = canUserPickTeam(gameId, bId);
+
             return (
               <View key={m?.gameId ?? `${kind}${roundNum}-${idx}`} style={[styles.matchCard, winnerId ? styles.matchCardWinner : null]}>
                 <Text style={styles.matchLabel}>{getMatchLabel(m?.gameId ?? "")}</Text>
 
                 <Pressable
                   style={[styles.matchTeamRow, winnerId && aId && winnerId === aId ? styles.winnerRow : null]}
-                  disabled={!isAdminUnlocked || !aId}
+                  disabled={!canPickA}
                   onPress={() => {
                     if (!m?.gameId || !aId) return;
+                    if (!canUserPickTeam(m.gameId, aId)) return;
                     setPendingWin({ gameId: m.gameId, teamId: aId });
                   }}
                 >
@@ -1358,9 +1450,10 @@ if (bIn) {
 
                 <Pressable
                   style={[styles.matchTeamRow, winnerId && bId && winnerId === bId ? styles.winnerRow : null]}
-                  disabled={!isAdminUnlocked || !bId}
+                  disabled={!canPickB}
                   onPress={() => {
                     if (!m?.gameId || !bId) return;
+                    if (!canUserPickTeam(m.gameId, bId)) return;
                     setPendingWin({ gameId: m.gameId, teamId: bId });
                   }}
                 >
@@ -1377,7 +1470,7 @@ if (bIn) {
 
                 {winnerId ? <Text style={{ marginTop: 8, fontWeight: "900", color: "#16a34a" }}>WINNER SELECTED</Text> : null}
 
-                {isAdminUnlocked && pendingWin?.gameId === (m?.gameId ?? "") && (
+                {canTouchThisMatch && pendingWin?.gameId === (m?.gameId ?? "") && (
                   <View style={{ marginTop: 10 }}>
                     <Text style={{ fontWeight: "900", marginBottom: 8 }}>Confirm winner?</Text>
 
@@ -1576,7 +1669,6 @@ if (bIn) {
                     {overrideModeOn ? "Override ON: admin repair tools available." : "Override OFF: structured mode."}
                   </Text>
 
-                  {/* ✅ OVERRIDE TOOLS LIVE IN SEPARATE FILE */}
                   <PlayoffOverridePanel
                     enabled={overrideModeOn}
                     isAdmin={isAdminUnlocked}
