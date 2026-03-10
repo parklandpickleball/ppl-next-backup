@@ -422,18 +422,24 @@ export default function Home() {
                     contact link below.
                   </Text>
                 </View>
-{/* Pay Dues Button */}
-<Pressable
-  onPress={() => window.open(PAYPAL_DUES_URL, "_blank")}
-  style={styles.payDuesBtn}
->
-  <Text style={styles.payDuesBtnText}>Pay League Dues →</Text>
-</Pressable>
 
-<Text style={styles.payDuesNote}>
-  You will enter the correct amount at checkout (team, individual, discounts, or
-  paying for a teammate).
-</Text>
+                <Text style={styles.membershipSignupBanner}>
+                  SIGNUPS NOW OPEN FOR SEASON 4 - START DATE APRIL 13TH, 2026
+                </Text>
+
+                {/* Pay Dues Button */}
+                <Pressable
+                  onPress={() => window.open(PAYPAL_DUES_URL, "_blank")}
+                  style={styles.payDuesBtn}
+                >
+                  <Text style={styles.payDuesBtnText}>Pay League Dues →</Text>
+                </Pressable>
+
+                <Text style={styles.payDuesNote}>
+                  You will enter the correct amount at checkout (team, individual,
+                  discounts, or paying for a teammate).
+                </Text>
+
                 {/* Contact Card */}
                 <Pressable
                   onPress={() =>
@@ -1353,6 +1359,18 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(15, 23, 42, 0.08)" as any,
   } as any,
 
+  membershipSignupBanner: {
+    marginTop: 26,
+    marginBottom: 2,
+    fontSize: 22,
+    lineHeight: 30,
+    fontWeight: "900",
+    color: "#0F172A",
+    textAlign: "center",
+    maxWidth: 860,
+    letterSpacing: 0.3,
+  },
+
   membershipCard: {
     marginTop: 36,
     width: "100%",
@@ -1371,36 +1389,37 @@ const styles = StyleSheet.create({
     transitionDuration: "160ms" as any,
     transitionTimingFunction: "ease-out" as any,
   } as any,
+
   payDuesBtn: {
-  marginTop: 26,
-  width: "100%",
-  maxWidth: 600,
-  alignSelf: "center",
-  backgroundColor: "#0070BA",
-  borderRadius: 18,
-  paddingVertical: 18,
-  paddingHorizontal: 28,
-  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)" as any,
-  cursor: "pointer" as any,
-  alignItems: "center",
-} as any,
+    marginTop: 26,
+    width: "100%",
+    maxWidth: 600,
+    alignSelf: "center",
+    backgroundColor: "#0070BA",
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 28,
+    boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)" as any,
+    cursor: "pointer" as any,
+    alignItems: "center",
+  } as any,
 
-payDuesBtnText: {
-  fontSize: 18,
-  fontWeight: "900",
-  letterSpacing: 1.6,
-  color: "#FFFFFF",
-  textAlign: "center",
-} as any,
+  payDuesBtnText: {
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    color: "#FFFFFF",
+    textAlign: "center",
+  } as any,
 
-payDuesNote: {
-  marginTop: 10,
-  fontSize: 13,
-  lineHeight: 20,
-  color: "#475569",
-  maxWidth: 860,
-  textAlign: "center",
-} as any,
+  payDuesNote: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: "#475569",
+    maxWidth: 860,
+    textAlign: "center",
+  } as any,
 
   membershipCardTitle: {
     fontSize: 18,
