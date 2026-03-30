@@ -2,12 +2,10 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-export default async function handler(req: any, res: any) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ success: false, error: "Method not allowed" });
-  }
-
+export async function POST(req: Request) {
   try {
+    const body = await req.json();
+
     const {
       fullName,
       email,
@@ -17,7 +15,7 @@ export default async function handler(req: any, res: any) {
       partnerName,
       partnerPhone,
       paymentChoice,
-    } = req.body;
+    } = body;
 
     const emailContent = `
 New Registration:
@@ -41,9 +39,9 @@ Payment Choice: ${paymentChoice}
       text: emailContent,
     });
 
-    return res.status(200).json({ success: true });
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
   } catch (error) {
-    console.error("send-registration error:", error);
-    return res.status(500).json({ success: false, error: "Email failed to send" });
+    console.error(error);
+    return new Response(JSON.stringify({ success: false }), { status: 500 });
   }
 }
