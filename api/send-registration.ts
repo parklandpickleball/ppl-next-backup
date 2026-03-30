@@ -47,7 +47,11 @@ Payment Choice: ${paymentChoice}
 
     return res.status(200).json({ success: true });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false });
+    console.error("ERROR:", error);
+
+return res.status(500).json({
+  success: false,
+  error: (error as any)?.message || "unknown error"
+});
   }
 }
