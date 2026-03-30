@@ -40,7 +40,7 @@ Payment Choice: ${paymentChoice}
 
     await resend.emails.send({
       from: "onboarding@resend.dev",
-      to: ["parklandpickleballleague@gmail.com"],
+      to: ["brandon.reich@yahoo.com"],
       subject: "New PPL Registration",
       text: emailContent,
     });
