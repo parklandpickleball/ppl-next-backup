@@ -39,8 +39,11 @@ Payment Choice: ${paymentChoice}
 `;
 
     await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: ["brandon.reich@yahoo.com"],
+      from: "noreply@parklandpb.com",
+      to: [
+  "parklandpickleballleague@gmail.com",
+  "brandon.reich@yahoo.com"
+],
       subject: "New PPL Registration",
       text: emailContent,
     });
