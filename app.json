@@ -23,8 +23,8 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.breich99.parklandpickleballleaguenext"
     },
-    "web": {
-  "output": "server",
+ "web": {
+  "output": "static",
   "favicon": "./assets/images/favicon.png"
 },
     "plugins": [
