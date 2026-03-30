@@ -424,16 +424,24 @@ export default function Home() {
                 </View>
 
                 <Text style={styles.membershipSignupBanner}>
-                  SIGNUPS NOW OPEN FOR SEASON 4 - START DATE APRIL 13TH, 2026
-                </Text>
+  SIGNUPS NOW OPEN FOR SEASON 4 - START DATE APRIL 13TH, 2026
+</Text>
 
-                {/* Pay Dues Button */}
-                <Pressable
-                  onPress={() => window.open(PAYPAL_DUES_URL, "_blank")}
-                  style={styles.payDuesBtn}
-                >
-                  <Text style={styles.payDuesBtnText}>Pay League Dues →</Text>
-                </Pressable>
+{/* Register for Season Button */}
+<Pressable
+  onPress={() => router.push("/register" as any)}
+  style={styles.registerSeasonBtn}
+>
+  <Text style={styles.registerSeasonBtnText}>Register for Season →</Text>
+</Pressable>
+
+{/* Pay Dues Button */}
+<Pressable
+  onPress={() => window.open(PAYPAL_DUES_URL, "_blank")}
+  style={styles.payDuesBtn}
+>
+  <Text style={styles.payDuesBtnText}>Pay League Dues →</Text>
+</Pressable>
 
                 <Text style={styles.payDuesNote}>
                   You will enter the correct amount at checkout (team, individual,
@@ -1390,6 +1398,27 @@ const styles = StyleSheet.create({
     transitionTimingFunction: "ease-out" as any,
   } as any,
 
+registerSeasonBtn: {
+  marginTop: 26,
+  width: "100%",
+  maxWidth: 600,
+  alignSelf: "center",
+  backgroundColor: "#0F172A",
+  borderRadius: 18,
+  paddingVertical: 18,
+  paddingHorizontal: 28,
+  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)" as any,
+  cursor: "pointer" as any,
+  alignItems: "center",
+} as any,
+
+registerSeasonBtnText: {
+  fontSize: 18,
+  fontWeight: "900",
+  letterSpacing: 1.6,
+  color: "#FFFFFF",
+  textAlign: "center",
+} as any,
   payDuesBtn: {
     marginTop: 26,
     width: "100%",
