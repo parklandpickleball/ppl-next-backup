@@ -427,12 +427,12 @@ export default function Home() {
   SIGNUPS NOW OPEN FOR SEASON 4 - START DATE APRIL 13TH, 2026
 </Text>
 
-{/* Register for Season Button */}
+{/* New Member Registration */}
 <Pressable
   onPress={() => router.push("/register" as any)}
   style={styles.registerSeasonBtn}
 >
-  <Text style={styles.registerSeasonBtnText}>Register for Season →</Text>
+  <Text style={styles.registerSeasonBtnText}>New Member Registration →</Text>
 </Pressable>
 
 {/* Pay Dues Button */}
@@ -440,7 +440,7 @@ export default function Home() {
   onPress={() => window.open(PAYPAL_DUES_URL, "_blank")}
   style={styles.payDuesBtn}
 >
-  <Text style={styles.payDuesBtnText}>Pay League Dues →</Text>
+  <Text style={styles.payDuesBtnText}>Existing Member Dues →</Text>
 </Pressable>
 
                 <Text style={styles.payDuesNote}>
