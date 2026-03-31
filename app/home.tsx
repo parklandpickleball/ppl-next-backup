@@ -48,8 +48,6 @@ export default function Home() {
     setGalleryOpen(true);
   };
 
-  if (Platform.OS !== "web") return null;
-
   useEffect(() => {
     let alive = true;
 
