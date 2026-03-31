@@ -427,7 +427,13 @@ export default function Home() {
 
 {/* New Member Registration */}
 <Pressable
-  onPress={() => router.push("/register" as any)}
+  onPress={() => {
+    if (typeof window !== "undefined") {
+      window.location.href = "/register";
+      return;
+    }
+    router.push("/register" as any);
+  }}
   style={styles.registerSeasonBtn}
 >
   <Text style={styles.registerSeasonBtnText}>New Member Registration →</Text>
