@@ -93,6 +93,7 @@ export default function RootLayout() {
   (pathname === "" ||
     pathname === "/" ||
     pathname === "/home" ||
+    pathname === "/register" ||
     pathname === "/member-login" ||
     pathname === "/attendance");
 
