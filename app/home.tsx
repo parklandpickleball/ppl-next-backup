@@ -429,10 +429,8 @@ export default function Home() {
 <Pressable
   onPress={() => {
     if (typeof window !== "undefined") {
-      window.location.href = "/register";
-      return;
+      window.location.href = "https://parklandpb.com/register";
     }
-    router.push("/register" as any);
   }}
   style={styles.registerSeasonBtn}
 >
