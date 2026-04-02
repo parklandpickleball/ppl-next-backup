@@ -21,6 +21,9 @@ export default async function handler(req: any, res: any) {
       partnerName,
       partnerPhone,
       paymentChoice,
+      waiverAccepted,
+      waiverAcceptedAt,
+      waiverText,
     } = req.body;
 
     const emailContent = `
@@ -36,14 +39,23 @@ Partner Name: ${partnerName || "N/A"}
 Partner Phone: ${partnerPhone || "N/A"}
 
 Payment Choice: ${paymentChoice}
+
+Waiver Accepted: ${waiverAccepted ? "YES" : "NO"}
+Waiver Accepted At: ${waiverAcceptedAt || "N/A"}
+
+--- WAIVER CONTENT AGREED TO ---
+
+${waiverText || "N/A"}
+
+--------------------------------
 `;
 
     await resend.emails.send({
       from: "noreply@parklandpb.com",
       to: [
-  "parklandpickleballleague@gmail.com",
-  "brandon.reich@yahoo.com"
-],
+        "parklandpickleballleague@gmail.com",
+        "brandon.reich@yahoo.com"
+      ],
       subject: "New PPL Registration",
       text: emailContent,
     });
@@ -52,9 +64,9 @@ Payment Choice: ${paymentChoice}
   } catch (error) {
     console.error("ERROR:", error);
 
-return res.status(500).json({
-  success: false,
-  error: (error as any)?.message || "unknown error"
-});
+    return res.status(500).json({
+      success: false,
+      error: (error as any)?.message || "unknown error"
+    });
   }
 }
