@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   SafeAreaView,
   View,
@@ -7,8 +7,19 @@ import {
   Pressable,
   TextInput,
   ScrollView,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
+
+const WAIVER_TEXT = `Waiver & Release of Liability
+
+By registering for the Parkland Pickleball League, I acknowledge and agree that participation in pickleball and related league activities involves inherent risks of injury, including but not limited to falls, collisions, overexertion, equipment failure, and serious bodily injury.
+
+I voluntarily assume all risks associated with participation in the Parkland Pickleball League. I hereby release, waive, discharge, and covenant not to sue the Parkland Pickleball League, its organizers, commissioners, volunteers, staff, affiliates, and any host facility or venue partners from any and all liability, claims, demands, causes of action, damages, losses, or expenses arising out of or relating to any injury, illness, damage, or loss, including death, that may occur as a result of my participation, whether caused by negligence or otherwise, to the fullest extent permitted by law.
+
+I certify that I am physically able to participate and that I am solely responsible for my own health, safety, and medical needs.
+
+By clicking “I Agree,” I acknowledge that I have read, understood, and voluntarily agree to this Waiver & Release of Liability.`;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -31,7 +42,11 @@ export default function RegisterPage() {
 
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
   const [showZelleInfo, setShowZelleInfo] = useState(false);
-const [showPayPalInfo, setShowPayPalInfo] = useState(false);
+  const [showPayPalInfo, setShowPayPalInfo] = useState(false);
+
+  const [showWaiverModal, setShowWaiverModal] = useState(false);
+  const [waiverAccepted, setWaiverAccepted] = useState(false);
+  const [waiverAcceptedAt, setWaiverAcceptedAt] = useState("");
 
   const canContinueToPayment =
     fullName.trim() !== "" &&
@@ -42,6 +57,32 @@ const [showPayPalInfo, setShowPayPalInfo] = useState(false);
     paymentChoice.trim() !== "" &&
     (hasPartner !== "Yes" ||
       (partnerName.trim() !== "" && partnerPhone.trim() !== ""));
+
+  useEffect(() => {
+    if (
+      canContinueToPayment &&
+      !waiverAccepted &&
+      !showWaiverModal &&
+      !showPaymentSection
+    ) {
+      setShowWaiverModal(true);
+    }
+
+    if (!canContinueToPayment) {
+      setShowWaiverModal(false);
+      setWaiverAccepted(false);
+      setWaiverAcceptedAt("");
+      setShowPaymentSection(false);
+      setShowPaymentMethods(false);
+      setShowZelleInfo(false);
+      setShowPayPalInfo(false);
+    }
+  }, [
+    canContinueToPayment,
+    waiverAccepted,
+    showWaiverModal,
+    showPaymentSection,
+  ]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -181,39 +222,42 @@ const [showPayPalInfo, setShowPayPalInfo] = useState(false);
               )}
             </View>
 
-            {canContinueToPayment && !showPaymentSection && (
-  <Pressable
-    onPress={async () => {
-      try {
-        await fetch("/api/send-registration", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fullName,
-            email,
-            phoneNumber,
-            division,
-            hasPartner,
-            partnerName,
-            partnerPhone,
-            paymentChoice,
-          }),
-        });
+            {canContinueToPayment && waiverAccepted && !showPaymentSection && (
+              <Pressable
+                onPress={async () => {
+                  try {
+                    await fetch("/api/send-registration", {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        fullName,
+                        email,
+                        phoneNumber,
+                        division,
+                        hasPartner,
+                        partnerName,
+                        partnerPhone,
+                        paymentChoice,
+                        waiverAccepted: true,
+                        waiverAcceptedAt,
+                        waiverText: WAIVER_TEXT,
+                      }),
+                    });
 
-        setShowPaymentSection(true);
-      } catch (error) {
-        console.error("Error sending registration:", error);
-      }
-    }}
-    style={styles.continueBtn}
-  >
-    <Text style={styles.continueBtnText}>
-      Submit Registration & Continue to Payment
-    </Text>
-  </Pressable>
-)}
+                    setShowPaymentSection(true);
+                  } catch (error) {
+                    console.error("Error sending registration:", error);
+                  }
+                }}
+                style={styles.continueBtn}
+              >
+                <Text style={styles.continueBtnText}>
+                  Submit Registration & Continue to Payment
+                </Text>
+              </Pressable>
+            )}
 
             {showPaymentSection && (
               <View style={styles.paymentSection}>
@@ -230,75 +274,83 @@ const [showPayPalInfo, setShowPayPalInfo] = useState(false);
                 </Text>
 
                 <View style={{ width: "100%" }}>
-  <Pressable
-    onPress={() => setShowPaymentMethods(!showPaymentMethods)}
-    style={styles.payNowBtn}
-  >
-    <Text style={styles.payNowBtnText}>Pay League Dues</Text>
-  </Pressable>
+                  <Pressable
+                    onPress={() => setShowPaymentMethods(!showPaymentMethods)}
+                    style={styles.payNowBtn}
+                  >
+                    <Text style={styles.payNowBtnText}>Pay League Dues</Text>
+                  </Pressable>
 
-  {showPaymentMethods && (
-    <View style={styles.dropdown}>
-      {["Pay with Zelle", "Pay with PayPal"].map((item) => (
-        <Pressable
-          key={item}
-          onPress={() => {
-            if (item === "Pay with PayPal") {
-  setShowPayPalInfo(true);
-  setShowZelleInfo(false);
-  setShowPaymentMethods(false);
-}
-if (item === "Pay with Zelle") {
-  setShowZelleInfo(true);
-  setShowPayPalInfo(false);
-  setShowPaymentMethods(false);
-}
-          }}
-          style={styles.dropdownItem}
-        >
-          <Text style={styles.inputText}>{item}</Text>
-        </Pressable>
-      ))}
-    </View>
-  )}
-  {showZelleInfo && (
-  <View style={styles.paymentInfoCard}>
-    <Text style={styles.paymentInfoTitle}>Pay by Zelle</Text>
-    <Text style={styles.paymentInfoBody}>
-      Send{" "}
-      {paymentChoice === "Myself and My Partner" ? "$300" : "$175"}{" "}
-      payment via Zelle to:
-    </Text>
-    <Text style={styles.paymentInfoEmail}>
-      parklandpickleballleague@gmail.com
-    </Text>
-    <Text style={styles.paymentInfoBody}>
-      Memo: {fullName || "Your Name"} - {division || "Division"}
-    </Text>
-  </View>
-)}
-{showPayPalInfo && (
-  <View style={styles.paymentInfoCard}>
-    <Text style={styles.paymentInfoTitle}>Pay with PayPal</Text>
+                  {showPaymentMethods && (
+                    <View style={styles.dropdown}>
+                      {["Pay with Zelle", "Pay with PayPal"].map((item) => (
+                        <Pressable
+                          key={item}
+                          onPress={() => {
+                            if (item === "Pay with PayPal") {
+                              setShowPayPalInfo(true);
+                              setShowZelleInfo(false);
+                              setShowPaymentMethods(false);
+                            }
+                            if (item === "Pay with Zelle") {
+                              setShowZelleInfo(true);
+                              setShowPayPalInfo(false);
+                              setShowPaymentMethods(false);
+                            }
+                          }}
+                          style={styles.dropdownItem}
+                        >
+                          <Text style={styles.inputText}>{item}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                  {showZelleInfo && (
+                    <View style={styles.paymentInfoCard}>
+                      <Text style={styles.paymentInfoTitle}>Pay by Zelle</Text>
+                      <Text style={styles.paymentInfoBody}>
+                        Send{" "}
+                        {paymentChoice === "Myself and My Partner"
+                          ? "$300"
+                          : "$175"}{" "}
+                        payment via Zelle to:
+                      </Text>
+                      <Text style={styles.paymentInfoEmail}>
+                        parklandpickleballleague@gmail.com
+                      </Text>
+                      <Text style={styles.paymentInfoBody}>
+                        Memo: {fullName || "Your Name"} -{" "}
+                        {division || "Division"}
+                      </Text>
+                    </View>
+                  )}
+                  {showPayPalInfo && (
+                    <View style={styles.paymentInfoCard}>
+                      <Text style={styles.paymentInfoTitle}>
+                        Pay with PayPal
+                      </Text>
 
-    <Text style={styles.paymentInfoBody}>
-      Click below to complete your payment securely through PayPal.
-    </Text>
+                      <Text style={styles.paymentInfoBody}>
+                        Click below to complete your payment securely through
+                        PayPal.
+                      </Text>
 
-    <Pressable
-      onPress={() =>
-        window.open(
-          "https://www.paypal.com/ncp/payment/LG7NA3X2JFSAN",
-          "_blank"
-        )
-      }
-      style={styles.paypalBtn}
-    >
-      <Text style={styles.paypalBtnText}>Continue to PayPal</Text>
-    </Pressable>
-  </View>
-)}
-</View>
+                      <Pressable
+                        onPress={() =>
+                          window.open(
+                            "https://www.paypal.com/ncp/payment/LG7NA3X2JFSAN",
+                            "_blank"
+                          )
+                        }
+                        style={styles.paypalBtn}
+                      >
+                        <Text style={styles.paypalBtnText}>
+                          Continue to PayPal
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
               </View>
             )}
           </View>
@@ -308,6 +360,38 @@ if (item === "Pay with Zelle") {
           </Pressable>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={showWaiverModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Waiver & Release of Liability</Text>
+
+            <ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+            >
+              <Text style={styles.modalBody}>{WAIVER_TEXT}</Text>
+            </ScrollView>
+
+            <Pressable
+              onPress={() => {
+                const acceptedAt = new Date().toISOString();
+                setWaiverAccepted(true);
+                setWaiverAcceptedAt(acceptedAt);
+                setShowWaiverModal(false);
+              }}
+              style={styles.modalAgreeBtn}
+            >
+              <Text style={styles.modalAgreeBtnText}>I Agree</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -470,46 +554,101 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900",
   },
+
   paymentInfoCard: {
-  marginTop: 12,
-  backgroundColor: "#F8FAFC",
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: "rgba(15,23,42,0.08)",
-  padding: 16,
-},
+    marginTop: 12,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(15,23,42,0.08)",
+    padding: 16,
+  },
 
-paymentInfoTitle: {
-  fontSize: 18,
-  fontWeight: "900",
-  color: "#0F172A",
-  marginBottom: 8,
-},
+  paymentInfoTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 8,
+  },
 
-paymentInfoBody: {
-  fontSize: 15,
-  lineHeight: 22,
-  color: "#475569",
-  marginTop: 4,
-},
+  paymentInfoBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#475569",
+    marginTop: 4,
+  },
 
-paymentInfoEmail: {
-  marginTop: 8,
-  fontSize: 16,
-  fontWeight: "900",
-  color: "#0F172A",
-},
-paypalBtn: {
-  marginTop: 14,
-  backgroundColor: "#0070BA",
-  borderRadius: 12,
-  paddingVertical: 14,
-  alignItems: "center",
-},
+  paymentInfoEmail: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: "900",
+    color: "#0F172A",
+  },
 
-paypalBtnText: {
-  color: "#FFFFFF",
-  fontWeight: "900",
-  fontSize: 16,
-},
+  paypalBtn: {
+    marginTop: 14,
+    backgroundColor: "#0070BA",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+
+  paypalBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 16,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+
+  modalCard: {
+    width: "100%",
+    maxWidth: 560,
+    maxHeight: "85%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+  },
+
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#0F172A",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+
+  modalScroll: {
+    maxHeight: 420,
+  },
+
+  modalScrollContent: {
+    paddingBottom: 8,
+  },
+
+  modalBody: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: "#475569",
+  },
+
+  modalAgreeBtn: {
+    marginTop: 18,
+    backgroundColor: "#0F172A",
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+
+  modalAgreeBtnText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "900",
+  },
 });
