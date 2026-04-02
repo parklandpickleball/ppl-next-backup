@@ -104,6 +104,13 @@ export default function ManageTeamsScreen() {
   const [activeTarget, setActiveTarget] = useState<Team | null>(null);
   const [activeError, setActiveError] = useState<string | null>(null);
 
+  // ✅ EDIT MODAL STATE
+  const [editModalOpen, setEditModalOpen] = useState<boolean>(false);
+  const [editTarget, setEditTarget] = useState<Team | null>(null);
+  const [editPlayer1Name, setEditPlayer1Name] = useState<string>("");
+  const [editPlayer2Name, setEditPlayer2Name] = useState<string>("");
+  const [editError, setEditError] = useState<string | null>(null);
+
   // ✅ IMPORT MODAL STATE (new)
   const [importModalOpen, setImportModalOpen] = useState<boolean>(false);
   const [importLoading, setImportLoading] = useState<boolean>(false);
@@ -394,6 +401,83 @@ export default function ManageTeamsScreen() {
     }
   }, [closeMoveModal, moveSelectedDivisionId, moveTarget]);
 
+  // --- EDIT FLOW ---
+  const openEditModal = useCallback((team: Team) => {
+    setEditTarget(team);
+    setEditPlayer1Name(team.player1_name ?? "");
+    setEditPlayer2Name(team.player2_name ?? "");
+    setEditError(null);
+    setEditModalOpen(true);
+  }, []);
+
+  const closeEditModal = useCallback(() => {
+    setEditModalOpen(false);
+    setEditTarget(null);
+    setEditPlayer1Name("");
+    setEditPlayer2Name("");
+    setEditError(null);
+  }, []);
+
+  const confirmEditTeam = useCallback(async () => {
+    if (!editTarget) return;
+
+    const p1 = editPlayer1Name.trim();
+    const p2 = editPlayer2Name.trim();
+
+    if (!p1 || !p2) {
+      setEditError("Both player names are required.");
+      return;
+    }
+
+    const nextTeamName = `${p1}/${p2}`;
+
+    const dup = teams.some(
+      (t) =>
+        t.id !== editTarget.id &&
+        t.division === editTarget.division &&
+        normalizeName(t.team_name) === normalizeName(nextTeamName)
+    );
+
+    if (dup) {
+      setEditError("Duplicate team name in this division.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { error } = await supabase
+        .from("teams")
+        .update({
+          team_name: nextTeamName,
+          player1_name: p1,
+          player2_name: p2,
+        })
+        .eq("id", editTarget.id);
+
+      if (error) {
+        setEditError(error.message);
+        return;
+      }
+
+      setTeams((prev) =>
+        prev.map((t) =>
+          t.id === editTarget.id
+            ? {
+                ...t,
+                team_name: nextTeamName,
+                player1_name: p1,
+                player2_name: p2,
+              }
+            : t
+        )
+      );
+
+      closeEditModal();
+    } finally {
+      setBusy(false);
+    }
+  }, [closeEditModal, editPlayer1Name, editPlayer2Name, editTarget, teams]);
+
   // --- DELETE FLOW ---
   const openDeleteModal = useCallback((team: Team) => {
     setDeleteTarget(team);
@@ -666,7 +750,6 @@ export default function ManageTeamsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="always">
-        {/* ✅ RETURN TO ADMIN BUTTON (same spot/style as your other admin screens) */}
         <Pressable
           style={{
             backgroundColor: "#000",
@@ -692,7 +775,6 @@ export default function ManageTeamsScreen() {
           </View>
 
           <View style={{ flexDirection: "row", gap: 10 }}>
-            {/* ✅ IMPORT BUTTON (new) */}
             <Pressable
               onPress={() => void openImportModal()}
               style={({ pressed }) => [
@@ -785,6 +867,7 @@ export default function ManageTeamsScreen() {
                       <Text style={[styles.hcell, styles.colP]}>Player 2</Text>
                       <Text style={[styles.hcell, styles.colStatus]}>Payment</Text>
                       <Text style={[styles.hcell, styles.colActive]}>Status</Text>
+                      <Text style={[styles.hcell, styles.colEdit]}>Edit</Text>
                       <Text style={[styles.hcell, styles.colMove]}>Move</Text>
                       <Text style={[styles.hcell, styles.colDelete]}>Delete</Text>
                     </View>
@@ -855,6 +938,16 @@ export default function ManageTeamsScreen() {
                             </Pressable>
                           </View>
 
+                          <View style={[styles.cell, styles.colEdit]}>
+                            <Pressable
+                              onPress={() => openEditModal(team)}
+                              style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
+                              hitSlop={10}
+                            >
+                              <Text style={styles.editText}>EDIT</Text>
+                            </Pressable>
+                          </View>
+
                           <View style={[styles.cell, styles.colMove]}>
                             <Pressable
                               onPress={() => openMoveModal(team)}
@@ -885,7 +978,7 @@ export default function ManageTeamsScreen() {
         )}
       </ScrollView>
 
-      {/* ✅ IMPORT MODAL (new) */}
+      {/* IMPORT MODAL */}
       <Modal visible={importModalOpen} transparent animationType="fade" onRequestClose={closeImportModal}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -983,6 +1076,64 @@ export default function ManageTeamsScreen() {
                 disabled={busy}
               >
                 <Text style={styles.modalYesText}>{busy ? "Saving…" : "Yes"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* EDIT MODAL */}
+      <Modal visible={editModalOpen} transparent animationType="fade" onRequestClose={closeEditModal}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Team</Text>
+
+            <Text style={styles.modalSub}>Player 1</Text>
+            <TextInput
+              value={editPlayer1Name}
+              onChangeText={(text) => {
+                setEditPlayer1Name(text);
+                setEditError(null);
+              }}
+              placeholder="Enter Player 1 name"
+              style={styles.modalInput}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+
+            <Text style={styles.modalSub}>Player 2</Text>
+            <TextInput
+              value={editPlayer2Name}
+              onChangeText={(text) => {
+                setEditPlayer2Name(text);
+                setEditError(null);
+              }}
+              placeholder="Enter Player 2 name"
+              style={styles.modalInput}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+
+            <Text style={styles.modalSub}>
+              Team name will save as:{" "}
+              <Text style={styles.modalStrong}>
+                {`${editPlayer1Name.trim() || "Player1"}/${editPlayer2Name.trim() || "Player2"}`}
+              </Text>
+            </Text>
+
+            {editError ? <Text style={styles.modalError}>{editError}</Text> : null}
+
+            <View style={styles.modalRow}>
+              <Pressable style={({ pressed }) => [styles.modalCancel, pressed && styles.pressed]} onPress={closeEditModal}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.modalYes, busy && styles.disabled, pressed && !busy && styles.pressed]}
+                onPress={() => void confirmEditTeam()}
+                disabled={busy}
+              >
+                <Text style={styles.modalYesText}>{busy ? "Saving…" : "Save"}</Text>
               </Pressable>
             </View>
           </View>
@@ -1122,6 +1273,7 @@ const COL_TEAM = 320;
 const COL_P = 190;
 const COL_STATUS = 190;
 const COL_ACTIVE = 190;
+const COL_EDIT = 140;
 const COL_MOVE = 140;
 const COL_DELETE = 140;
 
@@ -1141,7 +1293,6 @@ const styles = StyleSheet.create({
   refreshBtn: { backgroundColor: "#111827", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
   refreshBtnText: { color: "#fff", fontWeight: "900" },
 
-  // ✅ import button styles (new)
   importBtn: { backgroundColor: "#1D4ED8", paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12 },
   importBtnText: { color: "#fff", fontWeight: "900" },
 
@@ -1189,6 +1340,7 @@ const styles = StyleSheet.create({
   colP: { width: COL_P, justifyContent: "center", alignItems: "center" },
   colStatus: { width: COL_STATUS, justifyContent: "center", alignItems: "center" },
   colActive: { width: COL_ACTIVE, justifyContent: "center", alignItems: "center" },
+  colEdit: { width: COL_EDIT, justifyContent: "center", alignItems: "center" },
   colMove: { width: COL_MOVE, justifyContent: "center", alignItems: "center" },
   colDelete: { width: COL_DELETE, justifyContent: "center", alignItems: "center" },
 
@@ -1262,6 +1414,22 @@ const styles = StyleSheet.create({
   },
   activeBtnText: { color: "#fff", fontWeight: "900" },
 
+  editBtn: {
+    width: "100%",
+    backgroundColor: "#000",
+    borderRadius: 12,
+    paddingVertical: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    ...(Platform.OS === "web"
+      ? ({
+          cursor: "pointer",
+          userSelect: "none",
+        } as unknown as object)
+      : null),
+  },
+  editText: { color: "#fff", fontWeight: "900" },
+
   moveBtn: {
     width: "100%",
     backgroundColor: "#1D4ED8",
@@ -1334,7 +1502,6 @@ const styles = StyleSheet.create({
   modalDelete: { flex: 1, backgroundColor: "#7F1D1D", borderRadius: 14, paddingVertical: 12, alignItems: "center" },
   modalDeleteText: { color: "#fff", fontWeight: "900", fontSize: 16 },
 
-  // ✅ import list row styles (new)
   importRow: {
     flexDirection: "row",
     alignItems: "center",
