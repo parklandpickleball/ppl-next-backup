@@ -629,6 +629,7 @@ export default function ResultsScreen() {
           value={search}
           onChangeText={setSearch}
           placeholder="Type a player or team name (e.g., brandon)"
+          placeholderTextColor={Platform.OS === "web" ? "#aaa" : "#000"}
           autoCapitalize="none"
           autoCorrect={false}
           underlineColorAndroid="transparent"

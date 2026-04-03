@@ -1258,16 +1258,19 @@ setTeamBTooltipData(null);
               </>
             ) : (
               <>
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  onChange={onNativeDateChange}
-                />
-                <Pressable style={styles.doneBtn} onPress={() => setDatePanelOpen(false)}>
-                  <Text style={styles.doneBtnText}>Done</Text>
-                </Pressable>
-              </>
+  <View style={{ backgroundColor: "#111", borderRadius: 14, padding: 8 }}>
+    <DateTimePicker
+      value={selectedDate}
+      mode="date"
+      display={Platform.OS === "ios" ? "inline" : "default"}
+      themeVariant="dark"
+      onChange={onNativeDateChange}
+    />
+  </View>
+  <Pressable style={styles.doneBtn} onPress={() => setDatePanelOpen(false)}>
+    <Text style={styles.doneBtnText}>Done</Text>
+  </Pressable>
+</>
             )}
 
             <Pressable style={styles.closeBtn} onPress={() => setDatePanelOpen(false)}>
