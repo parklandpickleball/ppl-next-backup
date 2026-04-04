@@ -425,6 +425,48 @@ export default function Home() {
   SIGNUPS NOW OPEN FOR SEASON 4 - START DATE APRIL 13TH, 2026
 </Text>
 
+<View style={{
+  marginTop: 20,
+  padding: 16,
+  borderRadius: 12,
+  backgroundColor: '#FFF8E1',
+  borderWidth: 2,
+  borderColor: '#FFC107',
+  shadowColor: '#000',
+  shadowOpacity: 0.1,
+  shadowRadius: 6,
+}}>
+  <Text style={{
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 10,
+  }}>
+    Season 4 Registration Status
+  </Text>
+
+  <Text style={{ textAlign: 'center', marginBottom: 4 }}>
+    Beginner Division — <Text style={{ fontWeight: '700', color: '#d32f2f' }}>FULL (16 Teams)</Text>
+  </Text>
+
+  <Text style={{ textAlign: 'center', marginBottom: 4 }}>
+    Intermediate Division — <Text style={{ fontWeight: '700', color: '#f57c00' }}>1 Spot Remaining</Text>
+  </Text>
+
+  <Text style={{ textAlign: 'center', marginBottom: 6 }}>
+    Advanced Division — <Text style={{ fontWeight: '700', color: '#2e7d32' }}>2 Spots Remaining</Text>
+  </Text>
+
+  <Text style={{
+    textAlign: 'center',
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#555'
+  }}>
+    ⚠️ Spots are filling quickly. Registration will close once divisions reach capacity.
+  </Text>
+</View>
+
 {/* New Member Registration */}
 <Pressable
   onPress={() => {
