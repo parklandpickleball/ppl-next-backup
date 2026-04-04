@@ -450,7 +450,7 @@ export default function Home() {
   </Text>
 
   <Text style={{ textAlign: 'center', marginBottom: 4 }}>
-    Intermediate Division — <Text style={{ fontWeight: '700', color: '#f57c00' }}>3 Spots Remaining</Text>
+    Intermediate Division — <Text style={{ fontWeight: '700', color: '#2e7d32' }}>3 Spots Remaining</Text>
   </Text>
 
   <Text style={{ textAlign: 'center', marginBottom: 6 }}>
