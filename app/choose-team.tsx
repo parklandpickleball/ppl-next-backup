@@ -60,22 +60,20 @@ export default function ChooseTeamScreen() {
 
 setTeams(teamRows);
 
-// ✅ WEB ONLY: skip only if season profile already has team_id
-if (Platform.OS === "web") {
-  const { data: { user } } = await supabase.auth.getUser();
+// ✅ ALL PLATFORMS: skip only if season profile already has team_id
+const { data: { user } } = await supabase.auth.getUser();
 
-  if (user && settings?.current_season_id) {
-    const { data: profile } = await supabase
-      .from("user_season_profiles")
-      .select("team_id")
-      .eq("user_id", user.id)
-      .eq("season_id", settings.current_season_id)
-      .maybeSingle();
+if (user && settings?.current_season_id) {
+  const { data: profile } = await supabase
+    .from("user_season_profiles")
+    .select("team_id")
+    .eq("user_id", user.id)
+    .eq("season_id", settings.current_season_id)
+    .maybeSingle();
 
-    if (profile?.team_id) {
-      router.replace("/choose-player" as any);
-      return;
-    }
+  if (profile?.team_id) {
+    router.replace("/choose-player" as any);
+    return;
   }
 }
 

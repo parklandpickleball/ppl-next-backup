@@ -70,22 +70,20 @@ export default function ChoosePlayerScreen() {
         }
 
         setPlayers(opts);
-            // ✅ WEB ONLY: skip only if THIS SEASON profile already has player_name
-if (Platform.OS === "web") {
-  const { data: { user } } = await supabase.auth.getUser();
+            // ✅ ALL PLATFORMS: skip only if THIS SEASON profile already has player_name
+const { data: { user } } = await supabase.auth.getUser();
 
-  if (user) {
-    const { data: profile } = await supabase
-      .from("user_season_profiles")
-      .select("player_name")
-      .eq("user_id", user.id)
-      .eq("season_id", seasonId)
-      .maybeSingle();
+if (user) {
+  const { data: profile } = await supabase
+    .from("user_season_profiles")
+    .select("player_name")
+    .eq("user_id", user.id)
+    .eq("season_id", seasonId)
+    .maybeSingle();
 
-    if (profile?.player_name) {
-      router.replace("/(tabs)/schedule" as any);
-      return;
-    }
+  if (profile?.player_name) {
+    router.replace("/(tabs)/schedule" as any);
+    return;
   }
 }
 
