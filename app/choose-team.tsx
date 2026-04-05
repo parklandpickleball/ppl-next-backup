@@ -12,12 +12,14 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabaseClient";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type TeamRow = {
   id: string;
   team_name: string;
 };
 const WEB_LAST_TEAM_KEY = "PPL_WEB_LAST_TEAM_ID_V1";
+const LOCAL_TEAM_KEY = "PPL_LOCAL_TEAM_ID_V1";
 
 
 export default function ChooseTeamScreen() {
@@ -58,28 +60,24 @@ export default function ChooseTeamScreen() {
           return;
         }
 
-setTeams(teamRows);
+        setTeams(teamRows);
 
-// ✅ ALL PLATFORMS: skip only if season profile already has team_id
-const { data: { user } } = await supabase.auth.getUser();
+        // ✅ ALL PLATFORMS: skip only if season profile already has team_id
+        const { data: { user } } = await supabase.auth.getUser();
 
-if (user && settings?.current_season_id) {
-  const { data: profile } = await supabase
-    .from("user_season_profiles")
-    .select("team_id")
-    .eq("user_id", user.id)
-    .eq("season_id", settings.current_season_id)
-    .maybeSingle();
+        if (user && settings?.current_season_id) {
+          const { data: profile } = await supabase
+            .from("user_season_profiles")
+            .select("team_id")
+            .eq("user_id", user.id)
+            .eq("season_id", settings.current_season_id)
+            .maybeSingle();
 
-  if (profile?.team_id) {
-    router.replace("/choose-player" as any);
-    return;
-  }
-}
-
-
-
-
+          if (profile?.team_id) {
+            router.replace("/choose-player" as any);
+            return;
+          }
+        }
 
       } finally {
         setLoading(false);
@@ -122,7 +120,10 @@ if (user && settings?.current_season_id) {
         return;
       }
 
-            // ✅ WEB ONLY: remember their last selected team for next time
+      // ✅ LOCAL SAVE (critical fix)
+      await AsyncStorage.setItem(LOCAL_TEAM_KEY, teamId);
+
+      // ✅ WEB ONLY: remember their last selected team for next time
       if (Platform.OS === "web") {
         window?.localStorage?.setItem(WEB_LAST_TEAM_KEY, teamId);
       }
@@ -216,7 +217,6 @@ if (user && settings?.current_season_id) {
             })}
           </ScrollView>
 
-          {/* Admin Setup always available */}
           <Pressable
             onPress={openAdminSetup}
             style={{

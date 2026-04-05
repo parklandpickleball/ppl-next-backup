@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/constants/supabaseClient";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type AppSettingsRow = {
   current_season_id: string | null;
@@ -20,6 +21,8 @@ type AppSettingsRow = {
 };
 
 const ACCEPTED_SEASON_KEY = "PPL_ACCEPTED_SEASON_ID_V3";
+const LOCAL_TEAM_KEY = "PPL_LOCAL_TEAM_ID_V1";
+const LOCAL_PLAYER_KEY = "PPL_LOCAL_PLAYER_NAME_V1";
 
 // ✅ Web uses localStorage, native uses SecureStore
 async function getAcceptedSeasonId(): Promise<string> {
@@ -95,8 +98,37 @@ export default function LeagueLockScreen() {
       // ✅ if device already unlocked THIS season, skip password screen
       const acceptedSeasonId = await getAcceptedSeasonId();
       if (acceptedSeasonId && acceptedSeasonId === data.current_season_id) {
-        router.replace("/choose-team" as any);
+        const localTeamId = await AsyncStorage.getItem(LOCAL_TEAM_KEY);
+        const localPlayerName = await AsyncStorage.getItem(LOCAL_PLAYER_KEY);
 
+        if (localTeamId && localPlayerName) {
+          router.replace("/(tabs)/schedule" as any);
+          return;
+        }
+
+        if (localTeamId) {
+          router.replace("/choose-player" as any);
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("user_season_profiles")
+          .select("team_id, player_name")
+          .eq("user_id", userId)
+          .eq("season_id", data.current_season_id)
+          .maybeSingle();
+
+        if (profile?.team_id && profile?.player_name) {
+          router.replace("/(tabs)/schedule" as any);
+          return;
+        }
+
+        if (profile?.team_id) {
+          router.replace("/choose-player" as any);
+          return;
+        }
+
+        router.replace("/choose-team" as any);
         return;
       }
 

@@ -10,11 +10,13 @@ import {
 
 import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabaseClient";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type PlayerOption = {
   name: string;
 };
 const WEB_LAST_PLAYER_KEY = "PPL_WEB_LAST_PLAYER_NAME_V1";
+const LOCAL_PLAYER_KEY = "PPL_LOCAL_PLAYER_NAME_V1";
 
 export default function ChoosePlayerScreen() {
   const router = useRouter();
@@ -128,6 +130,8 @@ if (user) {
         Alert.alert("Error", error.message);
         return;
       }
+
+      await AsyncStorage.setItem(LOCAL_PLAYER_KEY, selectedPlayer);
 
             // ✅ WEB ONLY: remember last selected player
       if (Platform.OS === "web") {
