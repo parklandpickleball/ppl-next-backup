@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabaseClient";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from "expo-secure-store";
 
 type TeamRow = {
   id: string;
@@ -121,7 +121,7 @@ export default function ChooseTeamScreen() {
       }
 
       // ✅ LOCAL SAVE (critical fix)
-      await AsyncStorage.setItem(LOCAL_TEAM_KEY, teamId);
+      await SecureStore.setItemAsync(LOCAL_TEAM_KEY, teamId);
 
       // ✅ WEB ONLY: remember their last selected team for next time
       if (Platform.OS === "web") {

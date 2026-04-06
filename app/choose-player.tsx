@@ -10,7 +10,7 @@ import {
 
 import { useRouter } from "expo-router";
 import { supabase } from "@/constants/supabaseClient";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from "expo-secure-store";
 
 type PlayerOption = {
   name: string;
@@ -131,7 +131,7 @@ if (user) {
         return;
       }
 
-      await AsyncStorage.setItem(LOCAL_PLAYER_KEY, selectedPlayer);
+      await SecureStore.setItemAsync(LOCAL_PLAYER_KEY, selectedPlayer);
 
             // ✅ WEB ONLY: remember last selected player
       if (Platform.OS === "web") {

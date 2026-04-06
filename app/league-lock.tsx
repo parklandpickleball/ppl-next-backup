@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/constants/supabaseClient";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type AppSettingsRow = {
   current_season_id: string | null;
@@ -98,8 +97,8 @@ export default function LeagueLockScreen() {
       // ✅ if device already unlocked THIS season, skip password screen
       const acceptedSeasonId = await getAcceptedSeasonId();
       if (acceptedSeasonId && acceptedSeasonId === data.current_season_id) {
-        const localTeamId = await AsyncStorage.getItem(LOCAL_TEAM_KEY);
-        const localPlayerName = await AsyncStorage.getItem(LOCAL_PLAYER_KEY);
+        const localTeamId = await SecureStore.getItemAsync(LOCAL_TEAM_KEY);
+        const localPlayerName = await SecureStore.getItemAsync(LOCAL_PLAYER_KEY);
 
         if (localTeamId && localPlayerName) {
           router.replace("/(tabs)/schedule" as any);
