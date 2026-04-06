@@ -466,8 +466,8 @@ export default function Home() {
   </Text>
 </View>
 
-{/* New Member Registration */}
-<Pressable
+{/* New Member Registration - hidden while oversold */}
+{false && <Pressable
   onPress={() => {
     if (typeof window !== "undefined") {
       window.location.href = "https://parklandpb.com/register";
@@ -476,7 +476,7 @@ export default function Home() {
   style={styles.registerSeasonBtn}
 >
   <Text style={styles.registerSeasonBtnText}>New Member Registration →</Text>
-</Pressable>
+</Pressable>}
 
 {/* Pay Dues Button */}
 <Pressable
