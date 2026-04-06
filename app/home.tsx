@@ -463,7 +463,6 @@ export default function Home() {
     fontStyle: 'italic',
     color: '#555'
   }}>
-    ⚠️ Spots are filling quickly. Registration will close once divisions reach capacity.
   </Text>
 </View>
 
