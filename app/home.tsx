@@ -450,11 +450,11 @@ export default function Home() {
   </Text>
 
   <Text style={{ textAlign: 'center', marginBottom: 4 }}>
-    Intermediate Division — <Text style={{ fontWeight: '700', color: '#2e7d32' }}>3 Spots Remaining</Text>
+    Intermediate Division — <Text style={{ fontWeight: '700', color: '#d32f2f' }}>FULL (16 Teams)</Text>
   </Text>
 
   <Text style={{ textAlign: 'center', marginBottom: 6 }}>
-    Advanced Division — <Text style={{ fontWeight: '700', color: '#2e7d32' }}>2 Spots Remaining</Text>
+    Advanced Division — <Text style={{ fontWeight: '700', color: '#d32f2f' }}>FULL (16 Teams)</Text>
   </Text>
 
   <Text style={{
