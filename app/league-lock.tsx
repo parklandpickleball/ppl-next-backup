@@ -97,8 +97,12 @@ export default function LeagueLockScreen() {
       // ✅ if device already unlocked THIS season, skip password screen
       const acceptedSeasonId = await getAcceptedSeasonId();
       if (acceptedSeasonId && acceptedSeasonId === data.current_season_id) {
-        const localTeamId = await SecureStore.getItemAsync(LOCAL_TEAM_KEY);
-        const localPlayerName = await SecureStore.getItemAsync(LOCAL_PLAYER_KEY);
+        const localTeamId = Platform.OS === "web"
+          ? (window?.localStorage?.getItem(LOCAL_TEAM_KEY) ?? null)
+          : await SecureStore.getItemAsync(LOCAL_TEAM_KEY);
+        const localPlayerName = Platform.OS === "web"
+          ? (window?.localStorage?.getItem(LOCAL_PLAYER_KEY) ?? null)
+          : await SecureStore.getItemAsync(LOCAL_PLAYER_KEY);
 
         if (localTeamId && localPlayerName) {
           router.replace("/(tabs)/schedule" as any);

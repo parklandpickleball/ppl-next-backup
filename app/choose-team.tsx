@@ -121,7 +121,11 @@ export default function ChooseTeamScreen() {
       }
 
       // ✅ LOCAL SAVE (critical fix)
-      await SecureStore.setItemAsync(LOCAL_TEAM_KEY, teamId);
+      if (Platform.OS === "web") {
+        window?.localStorage?.setItem(LOCAL_TEAM_KEY, teamId);
+      } else {
+        await SecureStore.setItemAsync(LOCAL_TEAM_KEY, teamId);
+      }
 
       // ✅ WEB ONLY: remember their last selected team for next time
       if (Platform.OS === "web") {

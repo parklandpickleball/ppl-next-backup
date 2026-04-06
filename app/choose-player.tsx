@@ -131,7 +131,11 @@ if (user) {
         return;
       }
 
-      await SecureStore.setItemAsync(LOCAL_PLAYER_KEY, selectedPlayer);
+      if (Platform.OS === "web") {
+        window?.localStorage?.setItem(LOCAL_PLAYER_KEY, selectedPlayer);
+      } else {
+        await SecureStore.setItemAsync(LOCAL_PLAYER_KEY, selectedPlayer);
+      }
 
             // ✅ WEB ONLY: remember last selected player
       if (Platform.OS === "web") {
