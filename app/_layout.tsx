@@ -86,6 +86,35 @@ export default function RootLayout() {
         setNeedsTeam(false);
         setNeedsPlayer(false);
       } else {
+        // ✅ If local says team is set, verify Supabase agrees
+        if (localTeamId) {
+          const userRes = await supabase.auth.getUser();
+          const uid = userRes.data.user?.id ?? null;
+          if (uid) {
+            const { data: profile } = await supabase
+              .from("user_season_profiles")
+              .select("team_id")
+              .eq("user_id", uid)
+              .eq("season_id", currentSeasonId)
+              .maybeSingle();
+
+            if (!profile?.team_id) {
+              if (Platform.OS === "web") {
+                window?.localStorage?.removeItem(LOCAL_TEAM_KEY);
+                window?.localStorage?.removeItem(LOCAL_PLAYER_KEY);
+              } else {
+                await SecureStore.deleteItemAsync(LOCAL_TEAM_KEY);
+                await SecureStore.deleteItemAsync(LOCAL_PLAYER_KEY);
+              }
+              setLocked(false);
+              setNeedsTeam(true);
+              setNeedsPlayer(false);
+              setReady(true);
+              return;
+            }
+          }
+        }
+
         setLocked(false);
         setNeedsTeam(!localTeamId);
         setNeedsPlayer(!!localTeamId && !localPlayerName);
