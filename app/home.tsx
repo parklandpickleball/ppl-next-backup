@@ -607,6 +607,21 @@ export default function Home() {
                     url="https://www.zenov-bpo.com/"
                     logo={require("../assets/images/Sponsors/zenov.png")}
                   />
+                  <SponsorCard
+                    name="Krona Management"
+                    url="https://kronamanagement.com/"
+                    logo={require("../assets/images/Sponsors/Krona.png")}
+                  />
+                  <SponsorCard
+                    name="Dear Olivia Bar & Kitchen"
+                    url="https://www.dearoliviaparkland.com/"
+                    logo={require("../assets/images/Sponsors/DearOlivia.png")}
+                  />
+                  <SponsorCard
+                    name="Hospitality Management"
+                    url="https://www.phospitality.com/"
+                    logo={require("../assets/images/Sponsors/HospitalityManagement.png")}
+                  />
                 </View>
               </View>
             </View>
