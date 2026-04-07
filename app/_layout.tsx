@@ -7,6 +7,8 @@ import * as SecureStore from "expo-secure-store";
 import { supabase } from "@/constants/supabaseClient";
 
 const ACCEPTED_SEASON_KEY = "PPL_ACCEPTED_SEASON_ID_V3";
+const LOCAL_TEAM_KEY = "PPL_LOCAL_TEAM_ID_V1";
+const LOCAL_PLAYER_KEY = "PPL_LOCAL_PLAYER_KEY_V1";
 
 
 async function getAcceptedSeasonId(): Promise<string> {
@@ -36,6 +38,8 @@ export default function RootLayout() {
   const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [locked, setLocked] = useState(true);
+  const [needsTeam, setNeedsTeam] = useState(false);
+  const [needsPlayer, setNeedsPlayer] = useState(false);
 
   useEffect(() => {
     let appState = AppState.currentState;
@@ -52,11 +56,23 @@ export default function RootLayout() {
       // ✅ lock if no accepted season, or season changed
       const shouldLock = !acceptedSeasonId || acceptedSeasonId !== currentSeasonId;
 
+      const localTeamId = Platform.OS === "web"
+        ? (window?.localStorage?.getItem(LOCAL_TEAM_KEY) ?? "")
+        : ((await SecureStore.getItemAsync(LOCAL_TEAM_KEY)) ?? "");
+
+      const localPlayerName = Platform.OS === "web"
+        ? (window?.localStorage?.getItem(LOCAL_PLAYER_KEY) ?? "")
+        : ((await SecureStore.getItemAsync(LOCAL_PLAYER_KEY)) ?? "");
+
       if (shouldLock) {
         await clearAcceptedSeasonId();
         setLocked(true);
+        setNeedsTeam(false);
+        setNeedsPlayer(false);
       } else {
         setLocked(false);
+        setNeedsTeam(!localTeamId);
+        setNeedsPlayer(!!localTeamId && !localPlayerName);
       }
 
       setReady(true);
@@ -102,8 +118,21 @@ export default function RootLayout() {
 
 
   // ✅ HARD GATE: if locked, force league-lock no matter where they are
-    if (locked && !isOnLeagueLock && !isPublicWebRoute) {
+  if (locked && !isOnLeagueLock && !isPublicWebRoute) {
     return <Redirect href="/league-lock" />;
+  }
+
+  // ✅ TEAM GATE: if unlocked but no team selected, force choose-team
+  const isOnChooseTeam = pathname === "/choose-team";
+  const isOnChoosePlayer = pathname === "/choose-player";
+  const isOnAdmin = pathname.includes("admin");
+
+  if (!locked && needsTeam && !isOnChooseTeam && !isOnChoosePlayer && !isOnAdmin && !isPublicWebRoute) {
+    return <Redirect href="/choose-team" />;
+  }
+
+  if (!locked && needsPlayer && !isOnChoosePlayer && !isOnAdmin && !isPublicWebRoute) {
+    return <Redirect href="/choose-player" />;
   }
 
 
