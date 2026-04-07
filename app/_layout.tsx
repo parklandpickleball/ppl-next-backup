@@ -45,13 +45,29 @@ export default function RootLayout() {
     let appState = AppState.currentState;
 
     const check = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("app_settings")
         .select("current_season_id")
         .single();
 
       const currentSeasonId = (data as any)?.current_season_id ?? "";
       const acceptedSeasonId = await getAcceptedSeasonId();
+
+      // ✅ If Supabase failed (network error, offline, etc.) and user has a valid
+      // local session, trust it — don't kick them out just because of a bad connection.
+      if ((error || !currentSeasonId) && acceptedSeasonId) {
+        const localTeamId = Platform.OS === "web"
+          ? (window?.localStorage?.getItem(LOCAL_TEAM_KEY) ?? "")
+          : ((await SecureStore.getItemAsync(LOCAL_TEAM_KEY)) ?? "");
+        const localPlayerName = Platform.OS === "web"
+          ? (window?.localStorage?.getItem(LOCAL_PLAYER_KEY) ?? "")
+          : ((await SecureStore.getItemAsync(LOCAL_PLAYER_KEY)) ?? "");
+        setLocked(false);
+        setNeedsTeam(!localTeamId);
+        setNeedsPlayer(!!localTeamId && !localPlayerName);
+        setReady(true);
+        return;
+      }
 
       // ✅ lock if no accepted season, or season changed
       const shouldLock = !acceptedSeasonId || acceptedSeasonId !== currentSeasonId;
