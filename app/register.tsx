@@ -316,7 +316,7 @@ export default function RegisterPage() {
                         payment via Zelle to:
                       </Text>
                       <Text style={styles.paymentInfoEmail}>
-                        parklandpickleballleague@gmail.com
+                        Parklandpb@gmail.com
                       </Text>
                       <Text style={styles.paymentInfoBody}>
                         Memo: {fullName || "Your Name"} -{" "}
