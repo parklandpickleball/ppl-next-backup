@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Stack, Redirect, usePathname } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -40,11 +40,15 @@ export default function RootLayout() {
   const [locked, setLocked] = useState(true);
   const [needsTeam, setNeedsTeam] = useState(false);
   const [needsPlayer, setNeedsPlayer] = useState(false);
+  const checking = useRef(false);
 
   useEffect(() => {
     let appState = AppState.currentState;
 
     const check = async () => {
+      if (checking.current) return;
+      checking.current = true;
+      try {
       // ✅ Always ensure a Supabase session exists before any checks
       if (Platform.OS !== "web") {
         const { data: sessionData } = await supabase.auth.getSession();
@@ -129,6 +133,9 @@ export default function RootLayout() {
       }
 
       setReady(true);
+      } finally {
+        checking.current = false;
+      }
     };
 
     void check();
