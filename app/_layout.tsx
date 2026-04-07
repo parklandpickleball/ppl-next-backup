@@ -8,7 +8,7 @@ import { supabase } from "@/constants/supabaseClient";
 
 const ACCEPTED_SEASON_KEY = "PPL_ACCEPTED_SEASON_ID_V3";
 const LOCAL_TEAM_KEY = "PPL_LOCAL_TEAM_ID_V1";
-const LOCAL_PLAYER_KEY = "PPL_LOCAL_PLAYER_KEY_V1";
+const LOCAL_PLAYER_KEY = "PPL_LOCAL_PLAYER_NAME_V1";
 
 
 async function getAcceptedSeasonId(): Promise<string> {
