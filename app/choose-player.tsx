@@ -161,7 +161,26 @@ if (user) {
     <View style={{ flex: 1, padding: 20 }}>
       {/* NEW BUTTON: Return to Choose Team */}
       <Pressable
-        onPress={() => router.replace("choose-team" as any)}
+        onPress={async () => {
+          try {
+            const userRes = await supabase.auth.getUser();
+            const userId = userRes.data.user?.id;
+            const { data: settings } = await supabase.from("app_settings").select("current_season_id").single();
+            const seasonId = settings?.current_season_id;
+            if (userId && seasonId) {
+              await supabase.from("user_season_profiles").update({ team_id: null, player_name: null }).eq("user_id", userId).eq("season_id", seasonId);
+            }
+            if (Platform.OS === "web") {
+              window?.localStorage?.removeItem("PPL_LOCAL_TEAM_ID_V1");
+              window?.localStorage?.removeItem(LOCAL_PLAYER_KEY);
+            } else {
+              await SecureStore.deleteItemAsync("PPL_LOCAL_TEAM_ID_V1");
+              await SecureStore.deleteItemAsync(LOCAL_PLAYER_KEY);
+            }
+          } finally {
+            router.replace("/choose-team" as any);
+          }
+        }}
         style={{
           marginBottom: 20,
           backgroundColor: "#ddd",
