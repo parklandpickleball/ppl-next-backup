@@ -45,6 +45,14 @@ export default function RootLayout() {
     let appState = AppState.currentState;
 
     const check = async () => {
+      // ✅ Always ensure a Supabase session exists before any checks
+      if (Platform.OS !== "web") {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData?.session) {
+          await supabase.auth.signInAnonymously();
+        }
+      }
+
       const { data, error } = await supabase
         .from("app_settings")
         .select("current_season_id")
