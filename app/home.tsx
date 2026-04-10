@@ -622,6 +622,16 @@ export default function Home() {
                     url="https://www.phospitality.com/"
                     logo={require("../assets/images/Sponsors/HospitalityManagement.png")}
                   />
+                  <SponsorCard
+                    name="The Nail Studio"
+                    url="https://www.thenailstudiocc.com"
+                    logo={require("../assets/images/Sponsors/NailStudio.png")}
+                  />
+                  <SponsorCard
+                    name="The Hobby Card Show"
+                    url="https://www.thehobbycardshow.com"
+                    logo={require("../assets/images/Sponsors/HobbyCard.png")}
+                  />
                 </View>
               </View>
             </View>
