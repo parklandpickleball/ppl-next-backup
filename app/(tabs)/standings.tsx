@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Modal,
+  Pressable,
   ScrollView,
   Text,
   View,
@@ -55,6 +58,7 @@ type TeamRow = {
   is_active: boolean | null;
   is_ghost: boolean | null; // ✅ NEW
   division: string | null; // ✅ current division stored on teams (Manage Teams)
+  photo_url: string | null;
 };
 
 type DivisionRow = { id: string; name: string | null };
@@ -125,6 +129,13 @@ export default function StandingsScreen() {
   // ✅ NEW: store ghost flag (Ghost never appears in standings/seedings)
   const [teamGhostById, setTeamGhostById] = useState<Record<string, boolean>>({});
 
+  const [teamPhotoById, setTeamPhotoById] = useState<Record<string, string | null>>({});
+
+  // Photo modal
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [photoModalUrl, setPhotoModalUrl] = useState<string | null>(null);
+  const [photoModalName, setPhotoModalName] = useState<string>("");
+
   // ✅ store CURRENT team division (from Manage Teams)
   const [teamDivisionById, setTeamDivisionById] = useState<Record<string, string | null>>({});
 
@@ -176,6 +187,7 @@ export default function StandingsScreen() {
       setTeamActiveById({});
       setTeamGhostById({});
       setTeamDivisionById({});
+      setTeamPhotoById({});
       setDivisionsById({});
       setErrorMsg("Could not load matches for this season.");
       return [];
@@ -203,25 +215,28 @@ export default function StandingsScreen() {
     if (teamIds.length) {
       const { data: teamRows } = await supabase
         .from("teams")
-        .select("id,team_name,is_active,is_ghost,division")
+        .select("id,team_name,is_active,is_ghost,division,photo_url")
         .in("id", teamIds);
 
       const nameMap: Record<string, string> = {};
       const activeMap: Record<string, boolean> = {};
       const ghostMap: Record<string, boolean> = {};
       const divMap: Record<string, string | null> = {};
+      const photoMap: Record<string, string | null> = {};
 
       (teamRows as TeamRow[] | null)?.forEach((t) => {
         nameMap[t.id] = (t.team_name ?? "Team").trim() || "Team";
         activeMap[t.id] = t.is_active !== false; // null/true => active, false => inactive
         ghostMap[t.id] = t.is_ghost === true;
         divMap[t.id] = t.division ?? null;
+        photoMap[t.id] = t.photo_url ?? null;
       });
 
       setTeamNameById(nameMap);
       setTeamActiveById(activeMap);
       setTeamGhostById(ghostMap);
       setTeamDivisionById(divMap);
+      setTeamPhotoById(photoMap);
 
       teamDivisionIds = Array.from(
         new Set(
@@ -235,6 +250,7 @@ export default function StandingsScreen() {
       setTeamActiveById({});
       setTeamGhostById({});
       setTeamDivisionById({});
+      setTeamPhotoById({});
     }
 
     // ✅ Divisions lookup must include:
@@ -299,6 +315,7 @@ export default function StandingsScreen() {
         setTeamActiveById({});
         setTeamGhostById({});
         setTeamDivisionById({});
+        setTeamPhotoById({});
         setDivisionsById({});
         setLoading(false);
         return;
@@ -728,19 +745,42 @@ export default function StandingsScreen() {
                               {idx + 1}
                             </Text>
 
-                            <Text
-                              style={{
-                                width: colTeam,
-                                paddingVertical: 10,
-                                paddingHorizontal: 10,
-                                fontWeight: "800",
-                                color: inactive ? COLORS.inactiveText : COLORS.text,
-                              }}
-                              numberOfLines={1}
-                            >
-                              {r.teamName}
-                              {inactive ? "  (INACTIVE)" : ""}
-                            </Text>
+                            {r.gamesPlayed >= 1 && teamPhotoById[r.teamId] ? (
+                              <Pressable
+                                style={{ width: colTeam, paddingVertical: 10, paddingHorizontal: 10 }}
+                                onPress={() => {
+                                  setPhotoModalUrl(teamPhotoById[r.teamId] ?? null);
+                                  setPhotoModalName(r.teamName);
+                                  setPhotoModalVisible(true);
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontWeight: "800",
+                                    color: inactive ? COLORS.inactiveText : "#1D4ED8",
+                                    textDecorationLine: "underline",
+                                  }}
+                                  numberOfLines={1}
+                                >
+                                  {r.teamName}
+                                  {inactive ? "  (INACTIVE)" : ""}
+                                </Text>
+                              </Pressable>
+                            ) : (
+                              <Text
+                                style={{
+                                  width: colTeam,
+                                  paddingVertical: 10,
+                                  paddingHorizontal: 10,
+                                  fontWeight: "800",
+                                  color: inactive ? COLORS.inactiveText : COLORS.text,
+                                }}
+                                numberOfLines={1}
+                              >
+                                {r.teamName}
+                                {inactive ? "  (INACTIVE)" : ""}
+                              </Text>
+                            )}
 
                             <Text style={{ width: colGP, paddingVertical: 10, textAlign: "center" }}>
                               {r.gamesPlayed}
@@ -792,6 +832,63 @@ export default function StandingsScreen() {
           })}
         </View>
       )}
+
+      {/* TEAM PHOTO MODAL */}
+      <Modal
+        visible={photoModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoModalVisible(false)}
+      >
+        <Pressable
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.75)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 24,
+          }}
+          onPress={() => setPhotoModalVisible(false)}
+        >
+          <Pressable
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 18,
+              padding: 20,
+              width: "100%",
+              maxWidth: 480,
+            }}
+            onPress={() => {}}
+          >
+            <Text
+              style={{ fontSize: 18, fontWeight: "900", color: "#111827", marginBottom: 14, textAlign: "center" }}
+            >
+              {photoModalName}
+            </Text>
+
+            {photoModalUrl ? (
+              <Image
+                source={{ uri: photoModalUrl }}
+                style={{ width: "100%", height: 280, borderRadius: 12 }}
+                resizeMode="cover"
+              />
+            ) : null}
+
+            <Pressable
+              style={{
+                marginTop: 16,
+                backgroundColor: "#111827",
+                borderRadius: 14,
+                paddingVertical: 12,
+                alignItems: "center",
+              }}
+              onPress={() => setPhotoModalVisible(false)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }

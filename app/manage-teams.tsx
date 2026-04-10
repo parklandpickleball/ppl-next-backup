@@ -10,7 +10,9 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { supabase } from "../constants/supabaseClient";
 import { useRouter } from "expo-router";
 
@@ -28,6 +30,7 @@ type Team = {
   player1_paid: boolean;
   player2_paid: boolean;
   is_active: boolean;
+  photo_url: string | null;
 };
 
 type PaymentStatus = "Not Paid" | "Partially Paid" | "Paid in full";
@@ -111,6 +114,13 @@ export default function ManageTeamsScreen() {
   const [editPlayer2Name, setEditPlayer2Name] = useState<string>("");
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Photo modal state
+  const [photoModalOpen, setPhotoModalOpen] = useState<boolean>(false);
+  const [photoTarget, setPhotoTarget] = useState<Team | null>(null);
+  const [photoUploading, setPhotoUploading] = useState<boolean>(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+
   // ✅ IMPORT MODAL STATE (new)
   const [importModalOpen, setImportModalOpen] = useState<boolean>(false);
   const [importLoading, setImportLoading] = useState<boolean>(false);
@@ -180,7 +190,7 @@ export default function ManageTeamsScreen() {
   const loadTeams = useCallback(async (sid: string) => {
     const { data, error } = await supabase
       .from("teams")
-      .select("id,division,team_name,player1_name,player2_name,player1_paid,player2_paid,is_active")
+      .select("id,division,team_name,player1_name,player2_name,player1_paid,player2_paid,is_active,photo_url")
       .eq("season_id", sid)
       .order("team_name");
 
@@ -192,6 +202,7 @@ export default function ManageTeamsScreen() {
     const safe = ((data ?? []) as any[]).map((t) => ({
       ...t,
       is_active: typeof t.is_active === "boolean" ? t.is_active : true,
+      photo_url: t.photo_url ?? null,
     })) as Team[];
 
     return safe;
@@ -550,6 +561,95 @@ export default function ManageTeamsScreen() {
     }
   }, [activeTarget, closeActiveModal]);
 
+  // --- PHOTO FLOW ---
+  const openPhotoModal = useCallback((team: Team) => {
+    setPhotoTarget(team);
+    setPhotoError(null);
+    setPhotoPreviewUrl(team.photo_url ?? null);
+    setPhotoModalOpen(true);
+  }, []);
+
+  const closePhotoModal = useCallback(() => {
+    setPhotoModalOpen(false);
+    setPhotoTarget(null);
+    setPhotoError(null);
+    setPhotoPreviewUrl(null);
+  }, []);
+
+  const pickAndUploadPhoto = useCallback(async () => {
+    if (!photoTarget) return;
+
+    const permResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permResult.granted) {
+      setPhotoError("Permission to access photos is required.");
+      return;
+    }
+
+    const pickerResult = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+      base64: true,
+    });
+
+    if (pickerResult.canceled || !pickerResult.assets?.length) return;
+
+    const asset = pickerResult.assets[0];
+    setPhotoUploading(true);
+    setPhotoError(null);
+
+    try {
+      const filePath = `${photoTarget.id}.jpg`;
+
+      let uploadError: any = null;
+
+      if (asset.base64) {
+        // Mobile: use base64 -> ArrayBuffer (most reliable on native)
+        const binary = atob(asset.base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const result = await supabase.storage
+          .from("team-photos")
+          .upload(filePath, bytes.buffer, { upsert: true, contentType: "image/jpeg" });
+        uploadError = result.error;
+      } else {
+        // Web fallback
+        const response = await fetch(asset.uri);
+        const arrayBuffer = await response.arrayBuffer();
+        const result = await supabase.storage
+          .from("team-photos")
+          .upload(filePath, arrayBuffer, { upsert: true, contentType: "image/jpeg" });
+        uploadError = result.error;
+      }
+
+      if (uploadError) {
+        setPhotoError(uploadError.message);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("team-photos").getPublicUrl(filePath);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
+
+      const { error: dbError } = await supabase
+        .from("teams")
+        .update({ photo_url: publicUrl })
+        .eq("id", photoTarget.id);
+
+      if (dbError) {
+        setPhotoError(dbError.message);
+        return;
+      }
+
+      setTeams((prev) =>
+        prev.map((t) => (t.id === photoTarget.id ? { ...t, photo_url: publicUrl } : t))
+      );
+      setPhotoPreviewUrl(publicUrl);
+    } finally {
+      setPhotoUploading(false);
+    }
+  }, [photoTarget]);
+
   // =========================
   // ✅ IMPORT FLOW (new)
   // =========================
@@ -870,6 +970,7 @@ export default function ManageTeamsScreen() {
                       <Text style={[styles.hcell, styles.colEdit]}>Edit</Text>
                       <Text style={[styles.hcell, styles.colMove]}>Move</Text>
                       <Text style={[styles.hcell, styles.colDelete]}>Delete</Text>
+                      <Text style={[styles.hcell, styles.colPhoto]}>Photo</Text>
                     </View>
 
                     {divisionTeams.map((team, idx) => {
@@ -965,6 +1066,22 @@ export default function ManageTeamsScreen() {
                               hitSlop={10}
                             >
                               <Text style={styles.deleteText}>DELETE</Text>
+                            </Pressable>
+                          </View>
+
+                          <View style={[styles.cell, styles.colPhoto]}>
+                            <Pressable
+                              onPress={() => openPhotoModal(team)}
+                              style={({ pressed }) => [
+                                styles.photoBtn,
+                                team.photo_url ? styles.photoBtnHasPhoto : null,
+                                pressed && styles.pressed,
+                              ]}
+                              hitSlop={10}
+                            >
+                              <Text style={styles.photoText}>
+                                {team.photo_url ? "📷 Edit" : "📷 Add"}
+                              </Text>
                             </Pressable>
                           </View>
                         </View>
@@ -1265,6 +1382,56 @@ export default function ManageTeamsScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* PHOTO MODAL */}
+      <Modal visible={photoModalOpen} transparent animationType="fade" onRequestClose={closePhotoModal}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Team Photo</Text>
+            <Text style={styles.modalWarn}>
+              Team: <Text style={styles.modalStrong}>{photoTarget?.team_name}</Text>
+            </Text>
+
+            {photoPreviewUrl ? (
+              <Image
+                source={{ uri: photoPreviewUrl }}
+                style={{ width: "100%", height: 200, borderRadius: 12, marginTop: 14 }}
+                resizeMode="cover"
+              />
+            ) : (
+              <View
+                style={{
+                  width: "100%",
+                  height: 120,
+                  borderRadius: 12,
+                  marginTop: 14,
+                  backgroundColor: "#F3F4F6",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ color: "#6B7280", fontWeight: "800" }}>No photo yet</Text>
+              </View>
+            )}
+
+            {photoError ? <Text style={styles.modalError}>{photoError}</Text> : null}
+
+            <View style={styles.modalRow}>
+              <Pressable style={({ pressed }) => [styles.modalCancel, pressed && styles.pressed]} onPress={closePhotoModal}>
+                <Text style={styles.modalCancelText}>Close</Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.modalPhoto, photoUploading && styles.disabled, pressed && !photoUploading && styles.pressed]}
+                onPress={() => void pickAndUploadPhoto()}
+                disabled={photoUploading}
+              >
+                <Text style={styles.modalPhotoText}>{photoUploading ? "Uploading…" : photoPreviewUrl ? "Change Photo" : "Upload Photo"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1276,6 +1443,7 @@ const COL_ACTIVE = 190;
 const COL_EDIT = 140;
 const COL_MOVE = 140;
 const COL_DELETE = 140;
+const COL_PHOTO = 140;
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
@@ -1343,6 +1511,7 @@ const styles = StyleSheet.create({
   colEdit: { width: COL_EDIT, justifyContent: "center", alignItems: "center" },
   colMove: { width: COL_MOVE, justifyContent: "center", alignItems: "center" },
   colDelete: { width: COL_DELETE, justifyContent: "center", alignItems: "center" },
+  colPhoto: { width: COL_PHOTO, justifyContent: "center", alignItems: "center" },
 
   tableRow: {
     flexDirection: "row",
@@ -1461,6 +1630,26 @@ const styles = StyleSheet.create({
       : null),
   },
   deleteText: { color: "#fff", fontWeight: "900" },
+
+  photoBtn: {
+    width: "100%",
+    backgroundColor: "#0369A1",
+    borderRadius: 12,
+    paddingVertical: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    ...(Platform.OS === "web"
+      ? ({
+          cursor: "pointer",
+          userSelect: "none",
+        } as unknown as object)
+      : null),
+  },
+  photoText: { color: "#fff", fontWeight: "900" },
+  photoBtnHasPhoto: { backgroundColor: "#0E7490" },
+
+  modalPhoto: { flex: 1, backgroundColor: "#0369A1", borderRadius: 14, paddingVertical: 12, alignItems: "center" },
+  modalPhotoText: { color: "#fff", fontWeight: "900", fontSize: 16 },
 
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.6 },
