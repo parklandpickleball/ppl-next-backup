@@ -869,8 +869,8 @@ export default function StandingsScreen() {
             {photoModalUrl ? (
               <Image
                 source={{ uri: photoModalUrl }}
-                style={{ width: "100%", height: 280, borderRadius: 12 }}
-                resizeMode="cover"
+                style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 12 }}
+                resizeMode="contain"
               />
             ) : null}
 
