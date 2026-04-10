@@ -3,12 +3,14 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   View,
   useWindowDimensions,
 } from "react-native";
+import Zoom from "react-native-zoom-reanimated";
 import { useFocusEffect } from "expo-router";
 import { supabase } from "../../constants/supabaseClient";
 
@@ -108,6 +110,35 @@ function toN(s: string) {
 }
 function diff(t: TeamTotals) {
   return t.pointsFor - t.pointsAgainst;
+}
+
+function WebZoomImage({ uri }: { uri: string }) {
+  const [zoom, setZoom] = useState(1);
+  return (
+    <View>
+      <View style={{ overflow: "hidden", borderRadius: 12, backgroundColor: "#000" }}>
+        <Image
+          source={{ uri }}
+          style={{ width: "100%", height: 340 * zoom, borderRadius: 12 }}
+          resizeMode="contain"
+        />
+      </View>
+      <View style={{ flexDirection: "row", justifyContent: "center", gap: 12, marginTop: 10 }}>
+        <Pressable
+          onPress={() => setZoom((z) => Math.max(1, z - 0.25))}
+          style={{ backgroundColor: "#374151", borderRadius: 8, paddingVertical: 6, paddingHorizontal: 18 }}
+        >
+          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "900" }}>−</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setZoom((z) => Math.min(4, z + 0.25))}
+          style={{ backgroundColor: "#374151", borderRadius: 8, paddingVertical: 6, paddingHorizontal: 18 }}
+        >
+          <Text style={{ color: "#fff", fontSize: 20, fontWeight: "900" }}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
 }
 
 export default function StandingsScreen() {
@@ -867,11 +898,17 @@ export default function StandingsScreen() {
             </Text>
 
             {photoModalUrl ? (
-              <Image
-                source={{ uri: photoModalUrl }}
-                style={{ width: "100%", aspectRatio: 4 / 3, borderRadius: 12 }}
-                resizeMode="contain"
-              />
+              Platform.OS === "web" ? (
+                <WebZoomImage uri={photoModalUrl} />
+              ) : (
+                <Zoom>
+                  <Image
+                    source={{ uri: photoModalUrl }}
+                    style={{ width: "100%", height: 380, borderRadius: 12 }}
+                    resizeMode="contain"
+                  />
+                </Zoom>
+              )
             ) : null}
 
             <Pressable
