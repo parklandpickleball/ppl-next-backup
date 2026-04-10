@@ -632,6 +632,11 @@ export default function Home() {
                     url="https://www.thehobbycardshow.com"
                     logo={require("../assets/images/Sponsors/HobbyCard.png")}
                   />
+                  <SponsorCard
+                    name="Pro Sanitize Solutions"
+                    url="https://prosanitizesolutions.com/"
+                    logo={require("../assets/images/Sponsors/ProSanitize.png")}
+                  />
                 </View>
               </View>
             </View>
