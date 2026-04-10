@@ -10,7 +10,6 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import Zoom from "react-native-zoom-reanimated";
 import { useFocusEffect } from "expo-router";
 import { supabase } from "../../constants/supabaseClient";
 
@@ -901,13 +900,19 @@ export default function StandingsScreen() {
               Platform.OS === "web" ? (
                 <WebZoomImage uri={photoModalUrl} />
               ) : (
-                <Zoom>
+                <ScrollView
+                  maximumZoomScale={4}
+                  minimumZoomScale={1}
+                  showsVerticalScrollIndicator={false}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ alignItems: "center" }}
+                >
                   <Image
                     source={{ uri: photoModalUrl }}
                     style={{ width: "100%", height: 380, borderRadius: 12 }}
                     resizeMode="contain"
                   />
-                </Zoom>
+                </ScrollView>
               )
             ) : null}
 
