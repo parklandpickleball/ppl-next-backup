@@ -14,6 +14,7 @@ import { useLocalSearchParams } from "expo-router";
 import { supabase } from "../constants/supabaseClient";
 
 type AppSettingsRow = { current_season_id: string | null };
+type SeasonRow = { id: string; name: string | null };
 
 const FALLBACK_SEASON_ID = "60e682dc-25db-4480-a924-f326755eef79";
 
@@ -44,6 +45,7 @@ export default function PublicAttendancePage() {
   const params = useLocalSearchParams();
 
   const [seasonId, setSeasonId] = useState<string>(FALLBACK_SEASON_ID);
+  const [seasonName, setSeasonName] = useState<string>("");
 
   // week can be passed in link like /attendance?week=8
   const initialWeek = useMemo(() => {
@@ -84,6 +86,15 @@ export default function PublicAttendancePage() {
         .maybeSingle<AppSettingsRow>();
       const sid = res.data?.current_season_id ?? null;
       setSeasonId(sid || FALLBACK_SEASON_ID);
+
+      if (sid) {
+        const seasonRes = await supabase
+          .from("seasons")
+          .select("id, name")
+          .eq("id", sid)
+          .maybeSingle<SeasonRow>();
+        setSeasonName(seasonRes.data?.name ?? "");
+      }
     };
 
     loadSeason();
@@ -184,6 +195,16 @@ export default function PublicAttendancePage() {
     });
   }, [players, search]);
 
+  const attendanceStats = useMemo(() => {
+    const attending = players.filter(
+      (p) => attendanceMap[`${p.teamId}-${p.playerWhich}`] === "IN"
+    ).length;
+    const notAttending = players.filter(
+      (p) => attendanceMap[`${p.teamId}-${p.playerWhich}`] === "OUT"
+    ).length;
+    return { attending, notAttending, awaiting: players.length - attending - notAttending };
+  }, [players, attendanceMap]);
+
   const weekOk = useMemo(() => Number.isFinite(week) && week > 0, [week]);
 
   const applyWeek = () => {
@@ -266,8 +287,11 @@ export default function PublicAttendancePage() {
       <View style={styles.header}>
         <Text style={styles.title}>PPL Attendance</Text>
         <Text style={styles.sub}>Pick your name, then tap IN or OUT.</Text>
-        <Text style={{ marginTop: 6, fontWeight: "800", color: "#444" }}>Season: {seasonId}</Text>
+        <Text style={{ marginTop: 6, fontWeight: "800", color: "#444" }}>Season: {seasonName || seasonId}</Text>
         <Text style={{ marginTop: 2, fontWeight: "800", color: "#444" }}>Teams loaded: {teams.length}</Text>
+        <Text style={{ marginTop: 6, fontWeight: "800", color: "#16a34a" }}>Players Attending: {attendanceStats.attending}</Text>
+        <Text style={{ marginTop: 2, fontWeight: "800", color: "#dc2626" }}>Players Not Attending: {attendanceStats.notAttending}</Text>
+        <Text style={{ marginTop: 2, fontWeight: "800", color: "#888" }}>Awaiting Response: {attendanceStats.awaiting}</Text>
       </View>
 
     {!weekLockedFromLink ? (
