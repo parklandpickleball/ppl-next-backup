@@ -21,6 +21,7 @@ const FALLBACK_SEASON_ID = "60e682dc-25db-4480-a924-f326755eef79";
 type PlayerPick = {
   teamId: string;
   divisionId: string | null;
+  divisionName: string;
   teamName: string;
   playerWhich: 1 | 2;
   playerName: string;
@@ -158,7 +159,8 @@ export default function PublicAttendancePage() {
       if (!teamId) continue;
 
       const teamName = getStr(t, ["team_name", "name"], "Team");
-      const divisionId = getUuid(t, ["division_id"]) ?? null;
+      const divisionId = getUuid(t, ["division_id", "division"]) ?? null;
+      const divisionName = divisions.find((d) => d.id === divisionId)?.name ?? "";
 
       const p1 = getStr(t, ["player1_name", "player1", "p1_name"], "").trim();
       const p2 = getStr(t, ["player2_name", "player2", "p2_name"], "").trim();
@@ -167,6 +169,7 @@ export default function PublicAttendancePage() {
         out.push({
           teamId,
           divisionId,
+          divisionName,
           teamName,
           playerWhich: 1,
           playerName: p1,
@@ -176,6 +179,7 @@ export default function PublicAttendancePage() {
         out.push({
           teamId,
           divisionId,
+          divisionName,
           teamName,
           playerWhich: 2,
           playerName: p2,
@@ -185,7 +189,7 @@ export default function PublicAttendancePage() {
 
     // sort A-Z
     return out.sort((a, b) => a.playerName.localeCompare(b.playerName));
-  }, [teams]);
+  }, [teams, divisions]);
 
   const filteredPlayers = useMemo(() => {
     let list = players;
@@ -383,7 +387,7 @@ export default function PublicAttendancePage() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.pickName}>{p.playerName}</Text>
                   <Text style={styles.pickMeta}>
-                    {p.teamName} • Player {p.playerWhich}
+                    {p.teamName}{p.divisionName ? ` • ${p.divisionName}` : ""} • Player {p.playerWhich}
                   </Text>
                 </View>
                 <Text style={styles.pickRight}>
