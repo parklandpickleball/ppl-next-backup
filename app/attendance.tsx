@@ -65,6 +65,7 @@ export default function PublicAttendancePage() {
   const [divisions, setDivisions] = useState<any[]>([]);
 
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "IN" | "OUT" | "AWAITING">("ALL");
   const [selected, setSelected] = useState<PlayerPick | null>(null);
 
   // ✅ persisted status per player (teamId-playerWhich)
@@ -187,13 +188,23 @@ export default function PublicAttendancePage() {
   }, [teams]);
 
   const filteredPlayers = useMemo(() => {
+    let list = players;
+    if (statusFilter !== "ALL") {
+      list = list.filter((p) => {
+        const s = attendanceMap[`${p.teamId}-${p.playerWhich}`];
+        if (statusFilter === "IN") return s === "IN";
+        if (statusFilter === "OUT") return s === "OUT";
+        if (statusFilter === "AWAITING") return s === undefined;
+        return true;
+      });
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return players;
-    return players.filter((p) => {
+    if (!q) return list;
+    return list.filter((p) => {
       const label = `${p.playerName} ${p.teamName}`.toLowerCase();
       return label.includes(q);
     });
-  }, [players, search]);
+  }, [players, search, statusFilter, attendanceMap]);
 
   const attendanceStats = useMemo(() => {
     const attending = players.filter(
@@ -326,6 +337,21 @@ export default function PublicAttendancePage() {
           placeholder="Search your name…"
           style={styles.searchInput}
         />
+      </View>
+
+      <View style={styles.filterRow}>
+        <Text style={styles.filterLabel}>Show:</Text>
+        {(["ALL", "IN", "OUT", "AWAITING"] as const).map((f) => (
+          <Pressable
+            key={f}
+            onPress={() => setStatusFilter(f)}
+            style={[styles.filterChip, statusFilter === f && styles.filterChipActive]}
+          >
+            <Text style={[styles.filterChipText, statusFilter === f && styles.filterChipTextActive]}>
+              {f === "ALL" ? "All" : f === "IN" ? "In" : f === "OUT" ? "Out" : "Awaiting"}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       {loading ? (
@@ -474,6 +500,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     gap: 10,
   },
+  filterRow: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  filterLabel: { fontWeight: "900", color: "#444" },
+  filterChip: {
+    borderWidth: 2,
+    borderColor: "#ccc",
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  filterChipActive: { borderColor: "#111", backgroundColor: "#111" },
+  filterChipText: { fontWeight: "800", color: "#444", fontSize: 13 },
+  filterChipTextActive: { color: "#fff" },
+
   actionBtn: {
     borderRadius: 14,
     paddingVertical: 14,
