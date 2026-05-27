@@ -391,11 +391,11 @@ export default function Home() {
                 <View style={styles.cardRow}>
                   <InfoCard
                     title="Divisions"
-                    body="Beginner · Intermediate 1 · Intermediate 2 · Advanced  Structured levels supporting competitive progression."
+                    body="Beginner (2.0) · Intermediate 1 (2.5–3.0) · Intermediate 2 (3.5) · Advanced (4.0+)  Structured levels supporting competitive progression."
                   />
                   <InfoCard
                     title="Match Schedule"
-                    body="Structured Monday evening match windows from 5:30 PM through 9:00 PM."
+                    body="Beginner & Intermediate 1 divisions compete on Sunday evenings. Intermediate 2 & Advanced divisions compete on Monday evenings."
                   />
                   <InfoCard
                     title="Venue"
