@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   SafeAreaView,
   Text,
   View,
@@ -31,6 +32,16 @@ export default function Home() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.07, duration: 850, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 850, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
 
   // ✅ store measured Y positions for each section
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
@@ -296,6 +307,15 @@ export default function Home() {
               </Modal>
             )}
 
+            {/* SEASON 5 ANIMATED BADGE */}
+            <Animated.View style={[styles.heroBadgeWrap, { transform: [{ scale: pulseAnim }] }]}>
+              <Pressable style={styles.heroBadge} onPress={() => scrollTo("membership")}>
+                <Text style={styles.heroBadgeEyebrow}>🏓 SEASON 5</Text>
+                <Text style={styles.heroBadgeTitle}>Registration Now Open</Text>
+                <Text style={styles.heroBadgeCta}>Click to Register →</Text>
+              </Pressable>
+            </Animated.View>
+
             {/* premium card sitting over hero bottom (STARTING POINT) */}
             <View style={styles.heroCardOuter}>
               <View style={styles.heroCard}>
@@ -371,7 +391,7 @@ export default function Home() {
                 <View style={styles.cardRow}>
                   <InfoCard
                     title="Divisions"
-                    body="Beginner · Intermediate · Advanced  Structured levels supporting competitive progression."
+                    body="Beginner · Intermediate 1 · Intermediate 2 · Advanced  Structured levels supporting competitive progression."
                   />
                   <InfoCard
                     title="Match Schedule"
@@ -422,16 +442,16 @@ export default function Home() {
                 </View>
 
                 <Text style={styles.membershipSignupBanner}>
-  SIGNUPS NOW OPEN FOR SEASON 4 - START DATE APRIL 13TH, 2026
+  SIGNUPS NOW OPEN FOR SEASON 5
 </Text>
 
 <View style={{
   marginTop: 20,
   padding: 16,
   borderRadius: 12,
-  backgroundColor: '#FFF8E1',
+  backgroundColor: '#F0FFF4',
   borderWidth: 2,
-  borderColor: '#FFC107',
+  borderColor: '#16a34a',
   shadowColor: '#000',
   shadowOpacity: 0.1,
   shadowRadius: 6,
@@ -442,54 +462,33 @@ export default function Home() {
     textAlign: 'center',
     marginBottom: 10,
   }}>
-    Season 4 Registration Status
+    Season 5 Registration Status
   </Text>
 
   <Text style={{ textAlign: 'center', marginBottom: 4 }}>
-    Beginner Division — <Text style={{ fontWeight: '700', color: '#d32f2f' }}>FULL (16 Teams)</Text>
+    Beginner Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
   </Text>
 
   <Text style={{ textAlign: 'center', marginBottom: 4 }}>
-    Intermediate Division — <Text style={{ fontWeight: '700', color: '#d32f2f' }}>FULL (16 Teams)</Text>
+    Intermediate 1 Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
+  </Text>
+
+  <Text style={{ textAlign: 'center', marginBottom: 4 }}>
+    Intermediate 2 Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
   </Text>
 
   <Text style={{ textAlign: 'center', marginBottom: 6 }}>
-    Advanced Division — <Text style={{ fontWeight: '700', color: '#d32f2f' }}>FULL (16 Teams)</Text>
-  </Text>
-
-  <Text style={{
-    textAlign: 'center',
-    fontSize: 12,
-    fontStyle: 'italic',
-    color: '#555'
-  }}>
+    Advanced Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
   </Text>
 </View>
 
-{/* New Member Registration - hidden while oversold */}
-{false && <Pressable
-  onPress={() => {
-    if (typeof window !== "undefined") {
-      window.location.href = "https://parklandpb.com/register";
-    }
-  }}
+{/* New Member Registration */}
+<Pressable
+  onPress={() => router.push("/register")}
   style={styles.registerSeasonBtn}
 >
-  <Text style={styles.registerSeasonBtnText}>New Member Registration →</Text>
-</Pressable>}
-
-{/* Pay Dues Button */}
-<Pressable
-  onPress={() => window.open(PAYPAL_DUES_URL, "_blank")}
-  style={styles.payDuesBtn}
->
-  <Text style={styles.payDuesBtnText}>Existing Member Dues →</Text>
+  <Text style={styles.registerSeasonBtnText}>Register for Season 5</Text>
 </Pressable>
-
-                <Text style={styles.payDuesNote}>
-                  You will enter the correct amount at checkout (team, individual,
-                  discounts, or paying for a teammate).
-                </Text>
 
                 {/* Contact Card */}
                 <Pressable
@@ -865,6 +864,48 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundImage:
       "radial-gradient(circle at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.62) 100%)" as any,
+  } as any,
+
+  heroBadgeWrap: {
+    position: "absolute" as any,
+    top: 180,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 10 as any,
+  } as any,
+
+  heroBadge: {
+    backgroundColor: "#16a34a",
+    paddingVertical: 14,
+    paddingHorizontal: 28,
+    borderRadius: 50,
+    alignItems: "center",
+    cursor: "pointer" as any,
+    boxShadow: "0 0 28px rgba(22,163,74,0.7), 0 4px 20px rgba(0,0,0,0.4)" as any,
+  } as any,
+
+  heroBadgeEyebrow: {
+    color: "#bbf7d0",
+    fontWeight: "900" as any,
+    fontSize: 12,
+    letterSpacing: 2.5,
+    marginBottom: 3,
+  } as any,
+
+  heroBadgeTitle: {
+    color: "#ffffff",
+    fontWeight: "900" as any,
+    fontSize: 20,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  } as any,
+
+  heroBadgeCta: {
+    color: "#dcfce7",
+    fontWeight: "800" as any,
+    fontSize: 13,
+    letterSpacing: 0.5,
   } as any,
 
   // TOP NAV OVER HERO (DESKTOP ONLY)

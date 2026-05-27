@@ -30,6 +30,9 @@ export default function RegisterPage() {
   const [division, setDivision] = useState("");
   const [showDivisionOptions, setShowDivisionOptions] = useState(false);
 
+  const [memberStatus, setMemberStatus] = useState("");
+  const [showMemberStatusOptions, setShowMemberStatusOptions] = useState(false);
+
   const [hasPartner, setHasPartner] = useState("");
   const [showPartnerOptions, setShowPartnerOptions] = useState(false);
   const [partnerName, setPartnerName] = useState("");
@@ -48,11 +51,19 @@ export default function RegisterPage() {
   const [waiverAccepted, setWaiverAccepted] = useState(false);
   const [waiverAcceptedAt, setWaiverAcceptedAt] = useState("");
 
+  const dueAmount = (() => {
+    const isTeam = paymentChoice === "Myself and My Partner";
+    const isNew = memberStatus === "New Member";
+    if (isTeam) return isNew ? "$300" : "$250";
+    return isNew ? "$175" : "$150";
+  })();
+
   const canContinueToPayment =
     fullName.trim() !== "" &&
     email.trim() !== "" &&
     phoneNumber.trim() !== "" &&
     division.trim() !== "" &&
+    memberStatus.trim() !== "" &&
     hasPartner.trim() !== "" &&
     paymentChoice.trim() !== "" &&
     (hasPartner !== "Yes" ||
@@ -124,12 +135,40 @@ export default function RegisterPage() {
 
               {showDivisionOptions && (
                 <View style={styles.dropdown}>
-                  {["Beginner", "Intermediate", "Advanced"].map((item) => (
+                  {["Beginner", "Intermediate 1", "Intermediate 2", "Advanced"].map((item) => (
                     <Pressable
                       key={item}
                       onPress={() => {
                         setDivision(item);
                         setShowDivisionOptions(false);
+                      }}
+                      style={styles.dropdownItem}
+                    >
+                      <Text style={styles.inputText}>{item}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <View style={{ width: "100%" }}>
+              <Pressable
+                onPress={() => setShowMemberStatusOptions(!showMemberStatusOptions)}
+                style={styles.input}
+              >
+                <Text style={styles.inputText}>
+                  {memberStatus || "New or Returning Member?"}
+                </Text>
+              </Pressable>
+
+              {showMemberStatusOptions && (
+                <View style={styles.dropdown}>
+                  {["New Member", "Returning Member"].map((item) => (
+                    <Pressable
+                      key={item}
+                      onPress={() => {
+                        setMemberStatus(item);
+                        setShowMemberStatusOptions(false);
                       }}
                       style={styles.dropdownItem}
                     >
@@ -236,10 +275,12 @@ export default function RegisterPage() {
                         email,
                         phoneNumber,
                         division,
+                        memberStatus,
                         hasPartner,
                         partnerName,
                         partnerPhone,
                         paymentChoice,
+                        dueAmount,
                         waiverAccepted: true,
                         waiverAcceptedAt,
                         waiverText: WAIVER_TEXT,
@@ -263,14 +304,30 @@ export default function RegisterPage() {
               <View style={styles.paymentSection}>
                 <Text style={styles.paymentTitle}>Payment Information</Text>
 
-                <Text style={styles.paymentBody}>
-                  Please review your registration details above, then submit
-                  payment using the league payment option below.
-                </Text>
+                <View style={{
+                  backgroundColor: "#F0FFF4",
+                  borderWidth: 2,
+                  borderColor: "#16a34a",
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 14,
+                  alignItems: "center",
+                }}>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#555", marginBottom: 4 }}>
+                    {memberStatus} — {paymentChoice === "Myself and My Partner" ? "Team" : "Single"}
+                  </Text>
+                  <Text style={{ fontSize: 32, fontWeight: "900", color: "#16a34a" }}>
+                    {dueAmount}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: "#555", marginTop: 4, textAlign: "center" }}>
+                    {paymentChoice === "Myself and My Partner"
+                      ? "New teams: $300  ·  Returning teams: $250"
+                      : "New members: $175  ·  Returning members: $150"}
+                  </Text>
+                </View>
 
                 <Text style={styles.paymentBody}>
-                  Payment selection:{" "}
-                  <Text style={styles.paymentBold}>{paymentChoice}</Text>
+                  Please submit payment using one of the options below.
                 </Text>
 
                 <View style={{ width: "100%" }}>
@@ -309,11 +366,7 @@ export default function RegisterPage() {
                     <View style={styles.paymentInfoCard}>
                       <Text style={styles.paymentInfoTitle}>Pay by Zelle</Text>
                       <Text style={styles.paymentInfoBody}>
-                        Send{" "}
-                        {paymentChoice === "Myself and My Partner"
-                          ? "$300"
-                          : "$175"}{" "}
-                        payment via Zelle to:
+                        Send <Text style={styles.paymentBold}>{dueAmount}</Text> via Zelle to:
                       </Text>
                       <Text style={styles.paymentInfoEmail}>
                         Parklandpb@gmail.com
@@ -330,9 +383,29 @@ export default function RegisterPage() {
                         Pay with PayPal
                       </Text>
 
+                      <View style={{
+                        backgroundColor: "#F0FFF4",
+                        borderWidth: 2,
+                        borderColor: "#16a34a",
+                        borderRadius: 10,
+                        padding: 12,
+                        marginBottom: 12,
+                        alignItems: "center",
+                      }}>
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#555", marginBottom: 2 }}>
+                          Your amount due
+                        </Text>
+                        <Text style={{ fontSize: 30, fontWeight: "900", color: "#16a34a" }}>
+                          {dueAmount}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: "#555", marginTop: 4, textAlign: "center" }}>
+                          Enter this amount manually when prompted on PayPal.
+                        </Text>
+                      </View>
+
                       <Text style={styles.paymentInfoBody}>
-                        Click below to complete your payment securely through
-                        PayPal.
+                        Click below to open PayPal. When prompted, enter{" "}
+                        <Text style={styles.paymentBold}>{dueAmount}</Text> as your payment amount.
                       </Text>
 
                       <Pressable

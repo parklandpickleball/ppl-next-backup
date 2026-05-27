@@ -17,10 +17,12 @@ export default async function handler(req: any, res: any) {
       email,
       phoneNumber,
       division,
+      memberStatus,
       hasPartner,
       partnerName,
       partnerPhone,
       paymentChoice,
+      dueAmount,
       waiverAccepted,
       waiverAcceptedAt,
       waiverText,
@@ -33,12 +35,14 @@ Name: ${fullName}
 Email: ${email}
 Phone: ${phoneNumber}
 Division: ${division}
+Member Status: ${memberStatus || "N/A"}
 
 Has Partner: ${hasPartner}
 Partner Name: ${partnerName || "N/A"}
 Partner Phone: ${partnerPhone || "N/A"}
 
 Payment Choice: ${paymentChoice}
+Amount Due: ${dueAmount || "N/A"}
 
 Waiver Accepted: ${waiverAccepted ? "YES" : "NO"}
 Waiver Accepted At: ${waiverAcceptedAt || "N/A"}
