@@ -391,11 +391,11 @@ export default function Home() {
                 <View style={styles.cardRow}>
                   <InfoCard
                     title="Divisions"
-                    body="Beginner (2.0) · Intermediate 1 (2.5–3.0) · Intermediate 2 (3.5) · Advanced (4.0+)  Structured levels supporting competitive progression."
+                    body="Beginner (2.0) · Intermediate Silver (2.5–3.0) · Intermediate Gold (3.5) · Advanced (4.0+)  Structured levels supporting competitive progression."
                   />
                   <InfoCard
                     title="Match Schedule"
-                    body="Beginner & Intermediate 1 divisions compete on Sunday evenings. Intermediate 2 & Advanced divisions compete on Monday evenings."
+                    body="Beginner & Intermediate Silver divisions compete on Sunday evenings. Intermediate Gold & Advanced divisions compete on Monday evenings."
                   />
                   <InfoCard
                     title="Venue"
@@ -465,21 +465,36 @@ export default function Home() {
     Season 5 Registration Status
   </Text>
 
-  <Text style={{ textAlign: 'center', marginBottom: 4 }}>
-    Beginner Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
-  </Text>
-
-  <Text style={{ textAlign: 'center', marginBottom: 4 }}>
-    Intermediate 1 Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
-  </Text>
-
-  <Text style={{ textAlign: 'center', marginBottom: 4 }}>
-    Intermediate 2 Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
-  </Text>
-
-  <Text style={{ textAlign: 'center', marginBottom: 6 }}>
-    Advanced Division — <Text style={{ fontWeight: '700', color: '#16a34a' }}>OPEN</Text>
-  </Text>
+  {[
+    { name: 'Beginner', rating: '2.0', spots: 15 },
+    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 13 },
+    { name: 'Intermediate Gold', rating: '3.5', spots: 13 },
+    { name: 'Advanced', rating: '4.0+', spots: 13 },
+  ].map((div) => (
+    <View key={div.name} style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#fff',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#e2e8f0',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      marginBottom: 8,
+    }}>
+      <View>
+        <Text style={{ fontWeight: '800', fontSize: 17, color: '#0F172A' }}>{div.name}</Text>
+        <Text style={{ fontSize: 14, color: '#888', marginTop: 2 }}>Rating: {div.rating}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end' }}>
+        <View style={{ backgroundColor: '#dcfce7', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
+          <Text style={{ fontWeight: '900', fontSize: 13, color: '#16a34a', letterSpacing: 1 }}>OPEN</Text>
+        </View>
+        <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} spots remaining</Text>
+      </View>
+    </View>
+  ))}
 </View>
 
 {/* New Member Registration */}

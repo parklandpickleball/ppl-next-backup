@@ -135,7 +135,7 @@ export default function RegisterPage() {
 
               {showDivisionOptions && (
                 <View style={styles.dropdown}>
-                  {["Beginner", "Intermediate 1", "Intermediate 2", "Advanced"].map((item) => (
+                  {["Beginner (2.0)", "Intermediate Silver (2.5–3.0)", "Intermediate Gold (3.5)", "Advanced (4.0+)"].map((item) => (
                     <Pressable
                       key={item}
                       onPress={() => {
