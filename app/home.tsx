@@ -466,10 +466,10 @@ export default function Home() {
   </Text>
 
   {[
-    { name: 'Beginner', rating: '2.0', spots: 15 },
-    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 13 },
-    { name: 'Intermediate Gold', rating: '3.5', spots: 13 },
-    { name: 'Advanced', rating: '4.0+', spots: 13 },
+    { name: 'Beginner', rating: '2.0', spots: 9 },
+    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 4 },
+    { name: 'Intermediate Gold', rating: '3.5', spots: 9 },
+    { name: 'Advanced', rating: '4.0+', spots: 11 },
   ].map((div) => (
     <View key={div.name} style={{
       flexDirection: 'row',
