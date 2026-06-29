@@ -468,7 +468,7 @@ export default function Home() {
   {[
     { name: 'Beginner', rating: '2.0', spots: 4 },
     { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 1 },
-    { name: 'Intermediate Gold', rating: '3.5', spots: 4 },
+    { name: 'Intermediate Gold', rating: '3.5', spots: 3 },
     { name: 'Advanced', rating: '4.0+', spots: 4 },
   ].map((div) => (
     <View key={div.name} style={{
