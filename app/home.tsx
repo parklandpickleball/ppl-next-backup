@@ -466,11 +466,13 @@ export default function Home() {
   </Text>
 
   {[
-    { name: 'Beginner', rating: '2.0', spots: 4 },
-    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 1 },
+    { name: 'Beginner', rating: '2.0', spots: 6 },
+    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 0 },
     { name: 'Intermediate Gold', rating: '3.5', spots: 3 },
     { name: 'Advanced', rating: '4.0+', spots: 4 },
-  ].map((div) => (
+  ].map((div) => {
+    const soldOut = div.spots <= 0;
+    return (
     <View key={div.name} style={{
       flexDirection: 'row',
       alignItems: 'center',
@@ -488,13 +490,16 @@ export default function Home() {
         <Text style={{ fontSize: 14, color: '#888', marginTop: 2 }}>Rating: {div.rating}</Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <View style={{ backgroundColor: '#dcfce7', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
-          <Text style={{ fontWeight: '900', fontSize: 13, color: '#16a34a', letterSpacing: 1 }}>OPEN</Text>
+        <View style={{ backgroundColor: soldOut ? '#fee2e2' : '#dcfce7', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
+          <Text style={{ fontWeight: '900', fontSize: 13, color: soldOut ? '#dc2626' : '#16a34a', letterSpacing: 1 }}>{soldOut ? 'SOLD OUT' : 'OPEN'}</Text>
         </View>
-        <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} spots remaining</Text>
+        {!soldOut && (
+          <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} spots remaining</Text>
+        )}
       </View>
     </View>
-  ))}
+    );
+  })}
 </View>
 
 {/* New Member Registration */}
