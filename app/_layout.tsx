@@ -185,7 +185,13 @@ export default function RootLayout() {
   // ✅ TEAM GATE: if unlocked but no team selected, force choose-team
   const isOnChooseTeam = pathname === "/choose-team";
   const isOnChoosePlayer = pathname === "/choose-player";
-  const isOnAdmin = pathname.includes("admin");
+  const isOnAdmin =
+    pathname.includes("admin") ||
+    pathname === "/division-setup" ||
+    pathname === "/manage-teams" ||
+    pathname === "/schedule-builder" ||
+    pathname === "/season-selector" ||
+    pathname === "/playoff-mode";
 
   if (!locked && needsTeam && !isOnChooseTeam && !isOnChoosePlayer && !isOnAdmin && !isPublicWebRoute) {
     return <Redirect href="/choose-team" />;
