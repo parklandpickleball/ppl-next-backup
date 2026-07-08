@@ -494,7 +494,7 @@ export default function Home() {
           <Text style={{ fontWeight: '900', fontSize: 13, color: soldOut ? '#dc2626' : '#16a34a', letterSpacing: 1 }}>{soldOut ? 'SOLD OUT' : 'OPEN'}</Text>
         </View>
         {!soldOut && (
-          <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} spots remaining</Text>
+          <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} {div.spots === 1 ? 'spot' : 'spots'} remaining</Text>
         )}
       </View>
     </View>
