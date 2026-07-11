@@ -276,9 +276,10 @@ export default function ScoringScreen() {
 
   const weekLabel = useMemo(() => {
     if (selectedWeek == null) return "Select Week";
-    const d = formatWeekDate(selectedWeekRow?.week_date ?? null);
-    return d ? `Week ${selectedWeek} • ${d}` : `Week ${selectedWeek}`;
-  }, [selectedWeek, selectedWeekRow]);
+    // ✅ Just the week number — a week can now contain more than one date
+    // (e.g. Sunday and Monday divisions), so a single date here would be misleading.
+    return `Week ${selectedWeek}`;
+  }, [selectedWeek]);
 
   const getTeamKey = (matchId: string, which: "A" | "B") => `${matchId}__${which}`;
 
@@ -1126,8 +1127,7 @@ export default function ScoringScreen() {
                 .sort((a, b) => a.week - b.week)
                 .map((w) => {
                   const isSelected = w.week === selectedWeek;
-                  const d = formatWeekDate(w.week_date);
-                  const label = d ? `Week ${w.week} • ${d}` : `Week ${w.week}`;
+                  const label = `Week ${w.week}`;
 
                   return (
                     <Pressable

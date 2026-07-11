@@ -219,9 +219,10 @@ export default function ResultsScreen() {
   const weekLabel = useMemo(() => {
     if (selectedWeek == null) return "Select Week";
     if (selectedWeek === "ALL") return "All Weeks";
-    const d = formatWeekDate(selectedWeekRow?.week_date ?? null);
-    return d ? `Week ${selectedWeek} • ${d}` : `Week ${selectedWeek}`;
-  }, [selectedWeek, selectedWeekRow]);
+    // ✅ Just the week number — a week can now contain more than one date
+    // (e.g. Sunday and Monday divisions), so a single date here would be misleading.
+    return `Week ${selectedWeek}`;
+  }, [selectedWeek]);
 
   const selectedDivisionLabel = useMemo(() => {
     if (selectedDivisionId === "ALL") return "All Divisions";
@@ -859,8 +860,7 @@ export default function ResultsScreen() {
                 .sort((a, b) => a.week - b.week)
                 .map((w) => {
                   const isSelected = selectedWeek === w.week;
-                  const d = formatWeekDate(w.week_date);
-                  const label = d ? `Week ${w.week} • ${d}` : `Week ${w.week}`;
+                  const label = `Week ${w.week}`;
 
                   return (
                     <Pressable
