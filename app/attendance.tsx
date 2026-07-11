@@ -46,6 +46,7 @@ export default function PublicAttendancePage() {
   const params = useLocalSearchParams();
 
   const [seasonId, setSeasonId] = useState<string>(FALLBACK_SEASON_ID);
+  const [seasonResolved, setSeasonResolved] = useState(false);
   const [seasonName, setSeasonName] = useState<string>("");
 
   // week can be passed in link like /attendance?week=8
@@ -97,6 +98,8 @@ export default function PublicAttendancePage() {
           .maybeSingle<SeasonRow>();
         setSeasonName(seasonRes.data?.name ?? "");
       }
+
+      setSeasonResolved(true);
     };
 
     loadSeason();
@@ -104,7 +107,10 @@ export default function PublicAttendancePage() {
 
   useEffect(() => {
     const load = async () => {
-      if (!seasonId) return;
+      // ✅ Wait for the real current season to resolve before loading teams —
+      // otherwise this briefly loads FALLBACK_SEASON_ID's (last season's) teams
+      // first, since that's the initial state before app_settings resolves.
+      if (!seasonId || !seasonResolved) return;
 
       setLoading(true);
       try {
@@ -119,7 +125,7 @@ export default function PublicAttendancePage() {
     };
 
     load();
-  }, [seasonId]);
+  }, [seasonId, seasonResolved]);
 
   // ✅ THIS must be its own top-level hook (NOT nested)
   useEffect(() => {
