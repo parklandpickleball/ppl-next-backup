@@ -37,6 +37,7 @@ type MatchRow = {
   court: number | null;
   team_a_id: string | null;
   team_b_id: string | null;
+  date: string | null;
 };
 
 type TeamRow = { id: string; team_name: string | null };
@@ -288,7 +289,7 @@ const [duesDismissed, setDuesDismissed] = useState(false);
 
     let q = supabase
   .from("matches")
-  .select("id,season_id,week,division_id,match_time,court,team_a_id,team_b_id")
+  .select("id,season_id,week,division_id,match_time,court,team_a_id,team_b_id,date")
   .eq("season_id", seasonId)
   .eq("week", selectedWeek);
 
@@ -397,10 +398,6 @@ const { data: matchRows, error: matchErr } = await q
     const d = formatWeekDate(selectedWeekRow?.week_date ?? null);
     return d ? `Week ${selectedWeek} • ${d}` : `Week ${selectedWeek}`;
   }, [selectedWeek, selectedWeekRow]);
-
-  const tableDateLabel = useMemo(() => {
-    return formatWeekDate(selectedWeekRow?.week_date ?? null);
-  }, [selectedWeekRow]);
 
   const groups = useMemo(() => {
     const out: { divisionName: string; rows: MatchRow[] }[] = [];
@@ -616,7 +613,10 @@ const { data: matchRows, error: matchErr } = await q
                   const matchup = `${teamA ?? "TBD"} vs ${teamB ?? "TBD"}`;
                   const time = formatTimeTo12Hour(m.match_time);
                   const court = m.court != null ? String(m.court) : "";
-                  const metaLine = `${tableDateLabel}${time ? " • " + time : ""}${court ? " • Court " + court : ""}`;
+                  // ✅ Each match shows ITS OWN date (falls back to the week's date for
+                  // older matches saved before per-match dates existed).
+                  const matchDateLabel = formatWeekDate(m.date ?? selectedWeekRow?.week_date ?? null);
+                  const metaLine = `${matchDateLabel}${time ? " • " + time : ""}${court ? " • Court " + court : ""}`;
 
                   return (
                     <View
