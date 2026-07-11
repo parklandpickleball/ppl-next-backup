@@ -41,6 +41,7 @@ type MatchRow = {
   court: number | null;
   team_a_id: string | null;
   team_b_id: string | null;
+  date: string | null;
 };
 
 type TeamRow = { id: string; team_name: string | null };
@@ -364,7 +365,7 @@ export default function ResultsScreen() {
 
     let q = supabase
       .from("matches")
-      .select("id,season_id,week,division_id,match_time,court,team_a_id,team_b_id")
+      .select("id,season_id,week,division_id,match_time,court,team_a_id,team_b_id,date")
       .eq("season_id", sid);
 
     if (wk != null && wk !== "ALL") q = q.eq("week", wk);
@@ -709,6 +710,10 @@ export default function ResultsScreen() {
 
                   const time = formatTimeTo12Hour(m.match_time);
                   const courtNum = m.court != null ? String(m.court) : "";
+                  // ✅ Each match shows ITS OWN date so Sunday/Monday results under the
+                  // same week are distinguishable (falls back to the week's date for
+                  // older matches saved before per-match dates existed).
+                  const matchDateLabel = formatWeekDate(m.date ?? selectedWeekRow?.week_date ?? null);
 
                   return (
                     <View
@@ -731,6 +736,7 @@ export default function ResultsScreen() {
                       >
                         <Text style={{ fontWeight: "900" }}>
                           Week {m.week}
+                          {matchDateLabel ? ` • ${matchDateLabel}` : ""}
                           {time ? ` • ${time}` : ""}
                           {courtNum ? ` • Court ${courtNum}` : ""}
                         </Text>

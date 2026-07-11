@@ -51,6 +51,7 @@ type MatchRow = {
   team_a_id: string;
   team_b_id: string;
   created_at?: string;
+  date?: string | null; // ✅ per-match date (e.g. "2026-08-17") so one week can span multiple nights
 };
 
 type MatchDisplay = {
@@ -163,19 +164,25 @@ function formatDateLong(d: Date) {
   }
 }
 
-function weekdayName(d: Date) {
-  try {
-    return new Intl.DateTimeFormat("en-US", { weekday: "long" }).format(d);
-  } catch {
-    return "";
-  }
-}
-
 function ymdFromDate(d: Date) {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+// ✅ Short per-match date label (e.g. "Sun 8/17") for a stored "YYYY-MM-DD" string.
+function shortDateLabel(iso?: string | null): string {
+  if (!iso) return "No date";
+  const [y, m, d] = String(iso).split("-").map(Number);
+  if (!y || !m || !d) return "No date";
+  const dt = new Date(y, m - 1, d);
+  if (isNaN(dt.getTime())) return "No date";
+  try {
+    return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "numeric", day: "numeric" }).format(dt);
+  } catch {
+    return iso;
+  }
 }
 
 function getSavedWeekNumber(): number | null {
@@ -435,7 +442,7 @@ if (urlWeekNum && mapped.length > 0) {
   const loadMatches = useCallback(async (sid: string, weekNum: number) => {
     const res = await supabase
       .from("matches")
-      .select("id, season_id, week, division_id, match_time, court, team_a_id, team_b_id, created_at")
+      .select("id, season_id, week, division_id, match_time, court, team_a_id, team_b_id, created_at, date")
       .eq("season_id", sid)
       .eq("week", weekNum);
 
@@ -446,7 +453,7 @@ if (urlWeekNum && mapped.length > 0) {
   const loadSeasonMatchesForBadges = useCallback(async (sid: string) => {
     const res = await supabase
       .from("matches")
-      .select("id, week, match_time, court, team_a_id, team_b_id, created_at")
+      .select("id, week, match_time, court, team_a_id, team_b_id, created_at, date")
       .eq("season_id", sid);
 
     setSeasonMatches((res.data ?? []) as any);
@@ -474,6 +481,11 @@ if (urlWeekNum && mapped.length > 0) {
   }, [seasonId, selectedWeek, loadAttendance, loadMatches]);
 
   /* ------------------ SYNC DATE ------------------ */
+  // ✅ Only reset the date box when you switch to a DIFFERENT week number.
+  // (Previously this re-ran on every reload of the SAME week — e.g. right after
+  // saving a date change — which snapped the date box back to the old value.
+  // Now that each match stores its own date, the week-level date is just a
+  // starting point for a newly-selected week, not something to keep re-syncing to.)
   useEffect(() => {
     if (!selectedWeek?.weekDate) return;
     const [y, m, d] = String(selectedWeek.weekDate).split("-").map(Number);
@@ -485,7 +497,8 @@ if (urlWeekNum && mapped.length > 0) {
         setWebDate(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
       }
     }
-  }, [selectedWeek]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeek?.weekNumber]);
 
   const formattedDate = useMemo(() => formatDateLong(selectedDate), [selectedDate]);
   const bannerText = selectedWeek
@@ -703,20 +716,27 @@ if (urlWeekNum && mapped.length > 0) {
   /* ------------------ ✅ MATCH CONSTRAINTS (TIME = MINUTES, NOT STRING) ------------------ */
   const selectedTimeMinutes = useMemo(() => parseTimeToMinutes(selectedTime) ?? -1, [selectedTime]);
 
+  // ✅ The date currently in the date box — this is the date new/edited matches get stamped with,
+  // and the date conflict checks are scoped to (so Sunday and Monday matches under the same
+  // week never collide, even at the same court/time).
+  const selectedDateIso = useMemo(() => ymdFromDate(selectedDate), [selectedDate]);
+
   const bookedCourtsForTime = useMemo(() => {
     const s = new Set<number>();
     for (const m of matches) {
+      if (m.date !== selectedDateIso) continue;
       const mm = parseTimeToMinutes(m.match_time);
       if (mm != null && mm === selectedTimeMinutes) {
         s.add(Number(m.court));
       }
     }
     return s;
-  }, [matches, selectedTimeMinutes]);
+  }, [matches, selectedTimeMinutes, selectedDateIso]);
 
   const scheduledTeamsForTime = useMemo(() => {
     const s = new Set<string>();
     for (const m of matches) {
+      if (m.date !== selectedDateIso) continue;
       const mm = parseTimeToMinutes(m.match_time);
       if (mm != null && mm === selectedTimeMinutes) {
         s.add(m.team_a_id);
@@ -724,7 +744,7 @@ if (urlWeekNum && mapped.length > 0) {
       }
     }
     return s;
-  }, [matches, selectedTimeMinutes]);
+  }, [matches, selectedTimeMinutes, selectedDateIso]);
 
   /* ------------------ ✅ BADGE COUNTS ACROSS ALL WEEKS ------------------ */
   const priorCountByMatchId = useMemo(() => {
@@ -860,6 +880,7 @@ if (urlWeekNum && mapped.length > 0) {
       match_time: normalizeTo12Hour(selectedTime),
       team_a_id: teamAId,
       team_b_id: teamBId,
+      date: selectedDateIso, // ✅ stamp with whatever's in the date box right now (Sunday vs Monday vs a makeup date)
     };
 
     if (editingMatchId) {
@@ -914,6 +935,21 @@ setTeamBTooltipData(null);
     setSelectedCourt(Number(m.court));
     setTeamAId(m.team_a_id);
     setTeamBId(m.team_b_id);
+
+    // ✅ Move the date box to THIS match's own date so saving the edit doesn't
+    // silently reassign it to whatever night the box happened to be on.
+    if (m.date) {
+      const [y, mo, d] = String(m.date).split("-").map(Number);
+      if (y && mo && d) {
+        const dt = new Date(y, mo - 1, d);
+        if (!isNaN(dt.getTime())) {
+          setSelectedDate(dt);
+          if (Platform.OS === "web") {
+            setWebDate(`${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+          }
+        }
+      }
+    }
 
     // ✅ keep tooltip consistent in edit mode
     setTeamBTooltipData(null);
@@ -1024,15 +1060,15 @@ setTeamBTooltipData(null);
   };
 
   /* ------------------ SAVED MATCHES DISPLAY ------------------ */
-  const weekDateShort = useMemo(() => selectedWeek?.weekDate ?? "", [selectedWeek]);
-
   const savedMatchesDisplay = useMemo<MatchDisplay[]>(() => {
     if (!selectedWeek) return [];
-    const dayName = weekDateShort ? weekdayName(selectedDate) : "";
 
     return matchesForSelectedDivision
       .slice()
       .sort((a, b) => {
+        const da = a.date ?? "";
+        const db = b.date ?? "";
+        if (da !== db) return da.localeCompare(db);
         const ma = parseTimeToMinutes(a.match_time) ?? 0;
         const mb = parseTimeToMinutes(b.match_time) ?? 0;
         if (ma !== mb) return ma - mb;
@@ -1043,7 +1079,9 @@ setTeamBTooltipData(null);
         const aName = teamNameById.get(m.team_a_id) ?? "Team A";
         const bName = teamNameById.get(m.team_b_id) ?? "Team B";
 
-        const header = `Week ${m.week} · ${dayName || "No date"} · ${normalizeTo12Hour(m.match_time)} · Court ${m.court}`;
+        // ✅ Each match shows ITS OWN date (not the shared week-level date), so
+        // Sunday and Monday matches under the same week are clearly distinguishable.
+        const header = `Week ${m.week} · ${shortDateLabel(m.date)} · ${normalizeTo12Hour(m.match_time)} · Court ${m.court}`;
         const sub = `${divisionName}: ${aName} vs ${bName}`;
 
         const badge = priorCountByMatchId.get(String(m.id)) ?? 0;
@@ -1065,8 +1103,6 @@ setTeamBTooltipData(null);
     selectedWeek,
     divisionNameById,
     teamNameById,
-    weekDateShort,
-    selectedDate,
     priorCountByMatchId,
   ]);
 
@@ -1384,10 +1420,11 @@ setTeamBTooltipData(null);
                 onPress={() => {
   setSelectedTime(t);
 
-  // ✅ Default to FIRST available court for the newly selected time
+  // ✅ Default to FIRST available court for the newly selected time (same date as the date box)
   const timeMins = parseTimeToMinutes(t) ?? -1;
   const booked = new Set<number>();
   for (const m of matches) {
+    if (m.date !== selectedDateIso) continue;
     const mm = parseTimeToMinutes(m.match_time);
     if (mm != null && mm === timeMins) {
       booked.add(Number(m.court));

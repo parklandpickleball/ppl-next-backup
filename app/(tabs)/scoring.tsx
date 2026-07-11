@@ -46,6 +46,7 @@ type MatchRow = {
   court: number | null;
   team_a_id: string | null;
   team_b_id: string | null;
+  date: string | null;
 };
 
 type TeamRow = { id: string; team_name: string | null };
@@ -273,8 +274,6 @@ export default function ScoringScreen() {
     return weeks.find((w) => w.week === selectedWeek) ?? null;
   }, [weeks, selectedWeek]);
 
-  const weekDateLabel = useMemo(() => formatWeekDate(selectedWeekRow?.week_date ?? null), [selectedWeekRow]);
-
   const weekLabel = useMemo(() => {
     if (selectedWeek == null) return "Select Week";
     const d = formatWeekDate(selectedWeekRow?.week_date ?? null);
@@ -345,7 +344,7 @@ export default function ScoringScreen() {
 
     let q = supabase
       .from("matches")
-      .select("id,season_id,week,division_id,match_time,court,team_a_id,team_b_id")
+      .select("id,season_id,week,division_id,match_time,court,team_a_id,team_b_id,date")
       .eq("season_id", seasonId)
       .eq("week", selectedWeek);
 
@@ -868,6 +867,9 @@ export default function ScoringScreen() {
 
                   const time = formatTimeTo12Hour(m.match_time);
                   const court = m.court != null ? String(m.court) : "";
+                  // ✅ Each match shows ITS OWN date (falls back to the week's date for
+                  // older matches saved before per-match dates existed).
+                  const matchDateLabel = formatWeekDate(m.date ?? selectedWeekRow?.week_date ?? null);
 
                   return (
                     <View
@@ -889,7 +891,7 @@ export default function ScoringScreen() {
                         }}
                       >
                         <Text style={{ fontWeight: "900" }}>
-                          Week {m.week} • {weekDateLabel || ""} • {time} • Court {court}
+                          Week {m.week} • {matchDateLabel || ""} • {time} • Court {court}
                         </Text>
 
                         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
