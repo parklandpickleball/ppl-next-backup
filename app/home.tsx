@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
   SafeAreaView,
   Text,
   View,
@@ -32,16 +31,6 @@ export default function Home() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.07, duration: 850, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 850, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
 
   // ✅ store measured Y positions for each section
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
@@ -307,15 +296,6 @@ export default function Home() {
               </Modal>
             )}
 
-            {/* SEASON 5 ANIMATED BADGE */}
-            <Animated.View style={[styles.heroBadgeWrap, { transform: [{ scale: pulseAnim }] }]}>
-              <Pressable style={styles.heroBadge} onPress={() => scrollTo("membership")}>
-                <Text style={styles.heroBadgeEyebrow}>🏓 SEASON 5</Text>
-                <Text style={styles.heroBadgeTitle}>Registration Now Open</Text>
-                <Text style={styles.heroBadgeCta}>Click to Register →</Text>
-              </Pressable>
-            </Animated.View>
-
             {/* premium card sitting over hero bottom (STARTING POINT) */}
             <View style={styles.heroCardOuter}>
               <View style={styles.heroCard}>
@@ -441,8 +421,8 @@ export default function Home() {
                   </Text>
                 </View>
 
-                <Text style={styles.membershipSignupBanner}>
-  SIGNUPS NOW OPEN FOR SEASON 5
+                <Text style={[styles.membershipSignupBanner, { color: '#dc2626' }]}>
+  REGISTRATION CLOSED FOR SEASON 5
 </Text>
 
 <View style={{
@@ -490,25 +470,14 @@ export default function Home() {
         <Text style={{ fontSize: 14, color: '#888', marginTop: 2 }}>Rating: {div.rating}</Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <View style={{ backgroundColor: soldOut ? '#fee2e2' : '#dcfce7', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
-          <Text style={{ fontWeight: '900', fontSize: 13, color: soldOut ? '#dc2626' : '#16a34a', letterSpacing: 1 }}>{soldOut ? 'SOLD OUT' : 'OPEN'}</Text>
+        <View style={{ backgroundColor: '#fee2e2', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
+          <Text style={{ fontWeight: '900', fontSize: 13, color: '#dc2626', letterSpacing: 1 }}>{soldOut ? 'SOLD OUT' : 'CLOSED'}</Text>
         </View>
-        {!soldOut && (
-          <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} {div.spots === 1 ? 'spot' : 'spots'} remaining</Text>
-        )}
       </View>
     </View>
     );
   })}
 </View>
-
-{/* New Member Registration */}
-<Pressable
-  onPress={() => router.push("/register")}
-  style={styles.registerSeasonBtn}
->
-  <Text style={styles.registerSeasonBtnText}>Register for Season 5</Text>
-</Pressable>
 
                 {/* Contact Card */}
                 <Pressable
@@ -886,47 +855,6 @@ const styles = StyleSheet.create({
       "radial-gradient(circle at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.62) 100%)" as any,
   } as any,
 
-  heroBadgeWrap: {
-    position: "absolute" as any,
-    top: 180,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-    zIndex: 10 as any,
-  } as any,
-
-  heroBadge: {
-    backgroundColor: "#16a34a",
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 50,
-    alignItems: "center",
-    cursor: "pointer" as any,
-    boxShadow: "0 0 28px rgba(22,163,74,0.7), 0 4px 20px rgba(0,0,0,0.4)" as any,
-  } as any,
-
-  heroBadgeEyebrow: {
-    color: "#bbf7d0",
-    fontWeight: "900" as any,
-    fontSize: 12,
-    letterSpacing: 2.5,
-    marginBottom: 3,
-  } as any,
-
-  heroBadgeTitle: {
-    color: "#ffffff",
-    fontWeight: "900" as any,
-    fontSize: 20,
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  } as any,
-
-  heroBadgeCta: {
-    color: "#dcfce7",
-    fontWeight: "800" as any,
-    fontSize: 13,
-    letterSpacing: 0.5,
-  } as any,
 
   // TOP NAV OVER HERO (DESKTOP ONLY)
   heroTopNav: {
@@ -1532,27 +1460,6 @@ const styles = StyleSheet.create({
     transitionTimingFunction: "ease-out" as any,
   } as any,
 
-registerSeasonBtn: {
-  marginTop: 26,
-  width: "100%",
-  maxWidth: 600,
-  alignSelf: "center",
-  backgroundColor: "#0F172A",
-  borderRadius: 18,
-  paddingVertical: 18,
-  paddingHorizontal: 28,
-  boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)" as any,
-  cursor: "pointer" as any,
-  alignItems: "center",
-} as any,
-
-registerSeasonBtnText: {
-  fontSize: 18,
-  fontWeight: "900",
-  letterSpacing: 1.6,
-  color: "#FFFFFF",
-  textAlign: "center",
-} as any,
   payDuesBtn: {
     marginTop: 26,
     width: "100%",
