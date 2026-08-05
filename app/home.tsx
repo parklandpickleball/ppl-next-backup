@@ -295,17 +295,28 @@ export default function Home() {
                 </View>
               </Modal>
             )}
+          </View>
 
-            {/* premium card sitting over hero bottom (STARTING POINT) */}
-            <View style={styles.heroCardOuter}>
-              <View style={styles.heroCard}>
-                <View style={styles.heroCardTopRow}>
-                  <Text style={styles.heroCardKicker}>PARKLAND • FLORIDA</Text>
-                </View>
+          {/* premium card: overlaps the hero image on desktop; flows normally below it on mobile */}
+          <View
+            style={[
+              styles.heroCardOuter,
+              isMobileWeb && styles.heroCardOuterMobile,
+            ]}
+          >
+            <View style={[styles.heroCard, isMobileWeb && styles.heroCardMobile]}>
+              <View style={styles.heroCardTopRow}>
+                <Text style={styles.heroCardKicker}>PARKLAND • FLORIDA</Text>
+              </View>
 
-                <Text style={styles.heroCardTitle}>
-                  Parkland Pickleball League
-                </Text>
+              <Text
+                style={[
+                  styles.heroCardTitle,
+                  isMobileWeb && styles.heroCardTitleMobile,
+                ]}
+              >
+                Parkland Pickleball League
+              </Text>
 
                 <Text style={styles.heroCardBody}>
                   The Parkland Pickleball League is built on competitive
@@ -327,11 +338,10 @@ export default function Home() {
                 </View>
               </View>
             </View>
-          </View>
         </View>
 
-        {/* spacer for overlapping card */}
-        <View style={{ height: 320 }} />
+        {/* spacer for overlapping card (desktop only — mobile card flows in normal layout) */}
+        {!isMobileWeb && <View style={{ height: 320 }} />}
 
         {/* PREMIUM LOWER-HALF WRAPPER */}
         <View style={styles.lowerWrap}>
@@ -346,7 +356,7 @@ export default function Home() {
           >
             <View style={styles.container}>
               {/* ✅ League Info uses the same card style + forced shadow via extra style */}
-              <View style={styles.heroCard}>
+              <View style={[styles.heroCard, isMobileWeb && styles.heroCardMobile]}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>League Information</Text>
                   <Text style={styles.sectionBody}>
@@ -370,26 +380,32 @@ export default function Home() {
 
                 <View style={styles.cardRow}>
                   <InfoCard
+                    isMobile={isMobileWeb}
                     title="Divisions"
                     body="Beginner (2.0) · Intermediate Silver (2.5–3.0) · Intermediate Gold (3.5) · Advanced (4.0+)  Structured levels supporting competitive progression."
                   />
                   <InfoCard
+                    isMobile={isMobileWeb}
                     title="Match Schedule"
                     body="Beginner & Intermediate Silver divisions compete on Sunday evenings. Intermediate Gold & Advanced divisions compete on Monday evenings."
                   />
                   <InfoCard
+                    isMobile={isMobileWeb}
                     title="Venue"
                     body="Hosted at the Country Club of Coral Springs while the new Parkland courts are under development."
                   />
                   <InfoCard
+                    isMobile={isMobileWeb}
                     title="Growth"
                     body="Three divisions today — with structured expansion planned for future seasons."
                   />
                   <InfoCard
+                    isMobile={isMobileWeb}
                     title="Season Portal"
                     body="Live schedules, standings, results, announcements, and photos via our custom app"
                   />
                   <InfoCard
+                    isMobile={isMobileWeb}
                     title="League Culture"
                     body="Competitive, organized play built on sportsmanship and community."
                   />
@@ -408,7 +424,7 @@ export default function Home() {
             style={styles.sectionBand}
           >
             <View style={styles.container}>
-              <View style={styles.heroCard}>
+              <View style={[styles.heroCard, isMobileWeb && styles.heroCardMobile]}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>Membership</Text>
                   <Text style={styles.sectionBody}>
@@ -464,11 +480,11 @@ export default function Home() {
       paddingHorizontal: 14,
       marginBottom: 8,
     }}>
-      <View>
+      <View style={{ flex: 1, marginRight: 10 }}>
         <Text style={{ fontWeight: '800', fontSize: 17, color: '#0F172A' }}>{div.name}</Text>
         <Text style={{ fontSize: 14, color: '#888', marginTop: 2 }}>Rating: {div.rating}</Text>
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
+      <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
         <View style={{ backgroundColor: '#fee2e2', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
           <Text style={{ fontWeight: '900', fontSize: 13, color: '#dc2626', letterSpacing: 1 }}>CLOSED</Text>
         </View>
@@ -502,12 +518,12 @@ export default function Home() {
             style={styles.sectionBand}
           >
             <View style={styles.container}>
-              <View style={styles.heroCard}>
+              <View style={[styles.heroCard, isMobileWeb && styles.heroCardMobile]}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>Gallery</Text>
                 </View>
 
-                <View style={styles.galleryGrid}>
+                <View style={[styles.galleryGrid, isMobileWeb && styles.galleryGridMobile]}>
                   {galleryLoading ? (
                     <Text style={styles.sectionBody}>Loading photos…</Text>
                   ) : galleryUrls.length === 0 ? (
@@ -518,6 +534,7 @@ export default function Home() {
                         key={uri}
                         uri={uri}
                         onPress={() => openGalleryAt(i)}
+                        isMobile={isMobileWeb}
                       />
                     ))
                   )}
@@ -545,7 +562,10 @@ export default function Home() {
                         setGalleryIndex(6);
                         setGalleryOpen(true);
                       }}
-                      style={styles.commissionerPhotoWrap}
+                      style={[
+                        styles.commissionerPhotoWrap,
+                        isMobileWeb && styles.commissionerPhotoWrapMobile,
+                      ]}
                     >
                       <Image
                         source={{ uri: galleryUrls[6] }}
@@ -570,7 +590,7 @@ export default function Home() {
             style={styles.sectionBand}
           >
             <View style={styles.container}>
-              <View style={styles.heroCard}>
+              <View style={[styles.heroCard, isMobileWeb && styles.heroCardMobile]}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitle}>Sponsors</Text>
                   <Text style={styles.sectionBody}>
@@ -578,48 +598,57 @@ export default function Home() {
                   </Text>
                 </View>
 
-                <View style={styles.sponsorGrid}>
+                <View style={[styles.sponsorGrid, isMobileWeb && styles.sponsorGridMobile]}>
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="Diadem Sports"
                     url="https://diademsports.com/"
                     logo={require("../assets/images/Sponsors/diadem.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="Ellie Mental Health of Pembroke Pines, FL"
                     url="https://elliementalhealth.com/"
                     logo={require("../assets/images/Sponsors/ellie.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="Zenov BPO"
                     url="https://www.zenov-bpo.com/"
                     logo={require("../assets/images/Sponsors/zenov.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="Krona Management"
                     url="https://kronamanagement.com/"
                     logo={require("../assets/images/Sponsors/Krona.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="Dear Olivia Bar & Kitchen"
                     url="https://www.dearoliviaparkland.com/"
                     logo={require("../assets/images/Sponsors/DearOlivia.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="Hospitality Management"
                     url="https://www.phospitality.com/"
                     logo={require("../assets/images/Sponsors/HospitalityManagement.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="The Nail Studio"
                     url="https://www.thenailstudiocc.com"
                     logo={require("../assets/images/Sponsors/NailStudio.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="The Hobby Card Show"
                     url="https://www.thehobbycardshow.com"
                     logo={require("../assets/images/Sponsors/HobbyCard.png")}
                   />
                   <SponsorCard
+                    isMobile={isMobileWeb}
                     name="Pro Sanitize Solutions"
                     url="https://prosanitizesolutions.com/"
                     logo={require("../assets/images/Sponsors/ProSanitize.png")}
@@ -637,7 +666,7 @@ export default function Home() {
             style={styles.sectionBand}
           >
             <View style={styles.container}>
-              <View style={styles.heroCard}>
+              <View style={[styles.heroCard, isMobileWeb && styles.heroCardMobile]}>
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionKicker}>GET IN TOUCH</Text>
                   <Text style={styles.sectionTitle}>Contact</Text>
@@ -686,7 +715,12 @@ export default function Home() {
               <Image
                 source={{ uri: galleryUrls[galleryIndex] }}
                 resizeMode="contain"
-                style={styles.lightboxImg as any}
+                style={
+                  [
+                    styles.lightboxImg,
+                    isMobileWeb && styles.lightboxImgMobile,
+                  ] as any
+                }
               />
 
               <View style={styles.lightboxControls}>
@@ -757,9 +791,17 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function InfoCard({ title, body }: { title: string; body: string }) {
+function InfoCard({
+  title,
+  body,
+  isMobile,
+}: {
+  title: string;
+  body: string;
+  isMobile?: boolean;
+}) {
   return (
-    <View style={styles.infoCard}>
+    <View style={[styles.infoCard, isMobile && styles.infoCardMobile]}>
       <Text style={styles.infoCardTitle}>{title}</Text>
       <Text style={styles.infoCardBody}>{body}</Text>
     </View>
@@ -770,30 +812,48 @@ function SponsorCard({
   name,
   url,
   logo,
+  isMobile,
 }: {
   name: string;
   url: string;
   logo: any;
+  isMobile?: boolean;
 }) {
   return (
     <Pressable
       onPress={() => window.open(url, "_blank")}
-      style={styles.sponsorCard}
+      style={[styles.sponsorCard, isMobile && styles.sponsorCardMobile]}
     >
-      <Image source={logo} resizeMode="contain" style={styles.sponsorLogoFill} />
+      <Image
+        source={logo}
+        resizeMode="contain"
+        style={[styles.sponsorLogoFill, isMobile && styles.sponsorLogoFillMobile]}
+      />
       <Text style={styles.sponsorName}>{name}</Text>
     </Pressable>
   );
 }
 
-function GalleryTile({ uri, onPress }: { uri: string; onPress: () => void }) {
+function GalleryTile({
+  uri,
+  onPress,
+  isMobile,
+}: {
+  uri: string;
+  onPress: () => void;
+  isMobile?: boolean;
+}) {
   const [hovered, setHovered] = useState(false);
   return (
     <Pressable
       onPress={onPress}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
-      style={[styles.galleryTile, hovered && styles.galleryTileHover]}
+      style={[
+        styles.galleryTile,
+        isMobile && styles.galleryTileMobile,
+        hovered && styles.galleryTileHover,
+      ]}
     >
       <Image
         source={{ uri }}
@@ -1090,6 +1150,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
   } as any,
 
+  // Mobile web: the card no longer overlaps the hero image (its height varies
+  // too much with wrapped text to safely predict an overlap offset), so it
+  // flows in normal document order right after the image instead.
+  heroCardOuterMobile: {
+    position: "relative" as any,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    marginTop: -30,
+    paddingHorizontal: 16,
+  } as any,
+
   heroCard: {
     width: "100%",
     maxWidth: 1150,
@@ -1101,6 +1173,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(15, 23, 42, 0.08)" as any,
     boxShadow: "0 28px 70px rgba(15, 23, 42, 0.18)" as any,
     alignItems: "center",
+  } as any,
+
+  heroCardMobile: {
+    paddingHorizontal: 20,
+    paddingVertical: 28,
   } as any,
 
   heroCardTopRow: {
@@ -1131,6 +1208,11 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     color: "#0F172A",
     textAlign: "center",
+  },
+
+  heroCardTitleMobile: {
+    fontSize: 28,
+    lineHeight: 34,
   },
 
   heroCardBody: {
@@ -1269,6 +1351,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   } as any,
 
+  infoCardMobile: {
+    width: "100%",
+    minHeight: 0,
+  } as any,
+
   infoCardTitle: {
     fontSize: 18,
     fontWeight: "900",
@@ -1293,6 +1380,11 @@ const styles = StyleSheet.create({
     marginTop: 26,
   } as any,
 
+  galleryGridMobile: {
+    flexWrap: "wrap",
+    gap: 10,
+  } as any,
+
   galleryTile: {
     flex: 1,
     height: 190,
@@ -1311,6 +1403,13 @@ const styles = StyleSheet.create({
   galleryTileHover: {
     transform: [{ translateY: -4 }],
     boxShadow: "0 26px 60px rgba(15, 23, 42, 0.16)" as any,
+  } as any,
+
+  galleryTileMobile: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: "46%",
+    height: 150,
   } as any,
 
   galleryTileInner: {
@@ -1361,6 +1460,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   } as any,
 
+  sponsorGridMobile: {
+    gap: 14,
+  } as any,
+
   sponsorCard: {
     width: "31%",
     minHeight: 190,
@@ -1376,9 +1479,18 @@ const styles = StyleSheet.create({
     cursor: "pointer" as any,
   } as any,
 
+  sponsorCardMobile: {
+    width: "47%",
+    minHeight: 150,
+  } as any,
+
   sponsorLogoFill: {
     width: "100%",
     height: 110,
+  } as any,
+
+  sponsorLogoFillMobile: {
+    height: 70,
   } as any,
 
   sponsorLogoStub: {
@@ -1546,6 +1658,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#0B1220",
   } as any,
 
+  lightboxImgMobile: {
+    height: 360,
+  } as any,
+
   lightboxControls: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1612,6 +1728,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(15, 23, 42, 0.08)" as any,
     boxShadow: "0 18px 40px rgba(15, 23, 42, 0.10)" as any,
     cursor: "pointer" as any,
+  } as any,
+
+  // Fixed 700px height only matches the desktop crop at its fixed 520px width;
+  // on a phone the same height with a much narrower width badly distorts the crop,
+  // so mobile locks the aspect ratio instead.
+  commissionerPhotoWrapMobile: {
+    height: 420,
   } as any,
 
   commissionerPhoto: {
