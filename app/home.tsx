@@ -446,12 +446,11 @@ export default function Home() {
   </Text>
 
   {[
-    { name: 'Beginner', rating: '2.0', spots: 1 },
-    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 0 },
-    { name: 'Intermediate Gold', rating: '3.5', spots: 0 },
-    { name: 'Advanced', rating: '4.0+', spots: 3 },
+    { name: 'Beginner', rating: '2.0' },
+    { name: 'Intermediate Silver', rating: '2.5–3.0' },
+    { name: 'Intermediate Gold', rating: '3.5' },
+    { name: 'Advanced', rating: '4.0+' },
   ].map((div) => {
-    const soldOut = div.spots <= 0;
     return (
     <View key={div.name} style={{
       flexDirection: 'row',
@@ -471,7 +470,7 @@ export default function Home() {
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <View style={{ backgroundColor: '#fee2e2', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
-          <Text style={{ fontWeight: '900', fontSize: 13, color: '#dc2626', letterSpacing: 1 }}>{soldOut ? 'SOLD OUT' : 'CLOSED'}</Text>
+          <Text style={{ fontWeight: '900', fontSize: 13, color: '#dc2626', letterSpacing: 1 }}>CLOSED</Text>
         </View>
       </View>
     </View>
