@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   SafeAreaView,
   Text,
   View,
@@ -32,6 +33,26 @@ export default function Home() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  const bannerFlash = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bannerFlash, { toValue: 1, duration: 800, useNativeDriver: false }),
+        Animated.timing(bannerFlash, { toValue: 0, duration: 800, useNativeDriver: false }),
+      ])
+    ).start();
+  }, []);
+
+  const bannerBgColor = bannerFlash.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["#f59e0b", "#dc2626"],
+  });
+
+  const bannerScale = bannerFlash.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.015],
+  });
 
   // ✅ store measured Y positions for each section
   const [sectionY, setSectionY] = useState<Record<string, number>>({});
@@ -144,14 +165,21 @@ export default function Home() {
       <View style={styles.bg} />
 
       {/* ✅ FLOATING SEASON 6 REGISTRATION BANNER (stays visible while scrolling) */}
-      <Pressable
-        style={styles.registrationBanner}
-        onPress={() => scrollTo("membership")}
+      <Animated.View
+        style={[
+          styles.registrationBanner,
+          { backgroundColor: bannerBgColor, transform: [{ scale: bannerScale }] },
+        ]}
       >
-        <Text style={styles.registrationBannerText}>
-          🏓 SEASON 6 REGISTRATION IS NOW OPEN — Tap to Sign Up →
-        </Text>
-      </Pressable>
+        <Pressable
+          style={styles.registrationBannerPressable}
+          onPress={() => scrollTo("membership")}
+        >
+          <Text style={styles.registrationBannerText}>
+            🏓 SEASON 6 REGISTRATION IS NOW OPEN — Tap to Sign Up →
+          </Text>
+        </Pressable>
+      </Animated.View>
 
       {/* ✅ ScrollView now wraps EVERYTHING (including hero) so wheel works anywhere */}
       <ScrollView
@@ -1032,13 +1060,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: BANNER_HEIGHT,
-    backgroundColor: "#16a34a",
+    zIndex: 1000000 as any,
+    boxShadow: "0 0 22px rgba(245,158,11,0.55), 0 4px 14px rgba(0,0,0,0.35)" as any,
+  } as any,
+
+  registrationBannerPressable: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
-    zIndex: 1000000 as any,
     cursor: "pointer" as any,
-    boxShadow: "0 4px 14px rgba(0,0,0,0.25)" as any,
   } as any,
 
   registrationBannerText: {
@@ -1047,6 +1080,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 0.6,
     textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.35)" as any,
+    textShadowOffset: { width: 0, height: 1 } as any,
+    textShadowRadius: 3 as any,
   } as any,
 
   // ✅ MOBILE TOP BAR (MOBILE WEB ONLY)
