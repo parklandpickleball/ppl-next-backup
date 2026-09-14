@@ -17,7 +17,8 @@ import { supabase } from "../constants/supabaseClient";
 const LOGO = require("../assets/images/icon.png");
 const HERO_BG = require("../assets/images/hero.jpg");
 
-const HEADER_OFFSET = 90;
+const BANNER_HEIGHT = 44;
+const HEADER_OFFSET = 90 + BANNER_HEIGHT;
 const PAYPAL_DUES_URL = "https://www.paypal.com/ncp/payment/LG7NA3X2JFSAN";
 
 export default function Home() {
@@ -142,12 +143,25 @@ export default function Home() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.bg} />
 
+      {/* ✅ FLOATING SEASON 6 REGISTRATION BANNER (stays visible while scrolling) */}
+      <Pressable
+        style={styles.registrationBanner}
+        onPress={() => scrollTo("membership")}
+      >
+        <Text style={styles.registrationBannerText}>
+          🏓 SEASON 6 REGISTRATION IS NOW OPEN — Tap to Sign Up →
+        </Text>
+      </Pressable>
+
       {/* ✅ ScrollView now wraps EVERYTHING (including hero) so wheel works anywhere */}
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.page}
       >
+        {/* spacer so hero content clears the floating banner above */}
+        <View style={{ height: BANNER_HEIGHT }} />
+
         {/* HERO (full-bleed) */}
         <View style={styles.hero}>
           <View style={styles.heroBg}>
@@ -387,7 +401,7 @@ export default function Home() {
                   <InfoCard
                     isMobile={isMobileWeb}
                     title="Match Schedule"
-                    body="Beginner & Intermediate Silver divisions compete on Sunday evenings. Intermediate Gold & Advanced divisions compete on Monday evenings."
+                    body="Beginner & Intermediate Silver divisions compete on Wednesday evenings. Intermediate Gold & Advanced divisions compete on Monday evenings."
                   />
                   <InfoCard
                     isMobile={isMobileWeb}
@@ -437,8 +451,8 @@ export default function Home() {
                   </Text>
                 </View>
 
-                <Text style={[styles.membershipSignupBanner, { color: '#dc2626' }]}>
-  REGISTRATION CLOSED FOR SEASON 5
+                <Text style={[styles.membershipSignupBanner, { color: '#16a34a' }]}>
+  REGISTRATION OPEN FOR SEASON 6
 </Text>
 
 <View style={{
@@ -458,14 +472,14 @@ export default function Home() {
     textAlign: 'center',
     marginBottom: 10,
   }}>
-    Season 5 Registration Status
+    Season 6 Registration Status
   </Text>
 
   {[
-    { name: 'Beginner', rating: '2.0' },
-    { name: 'Intermediate Silver', rating: '2.5–3.0' },
-    { name: 'Intermediate Gold', rating: '3.5' },
-    { name: 'Advanced', rating: '4.0+' },
+    { name: 'Beginner', rating: '2.0', spots: 16 },
+    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 16 },
+    { name: 'Intermediate Gold', rating: '3.5', spots: 16 },
+    { name: 'Advanced', rating: '4.0+', spots: 14 },
   ].map((div) => {
     return (
     <View key={div.name} style={{
@@ -485,14 +499,23 @@ export default function Home() {
         <Text style={{ fontSize: 14, color: '#888', marginTop: 2 }}>Rating: {div.rating}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
-        <View style={{ backgroundColor: '#fee2e2', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
-          <Text style={{ fontWeight: '900', fontSize: 13, color: '#dc2626', letterSpacing: 1 }}>CLOSED</Text>
+        <View style={{ backgroundColor: '#dcfce7', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
+          <Text style={{ fontWeight: '900', fontSize: 13, color: '#16a34a', letterSpacing: 1 }}>OPEN</Text>
         </View>
+        <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} {div.spots === 1 ? 'spot' : 'spots'} remaining</Text>
       </View>
     </View>
     );
   })}
 </View>
+
+{/* New Member Registration */}
+<Pressable
+  onPress={() => router.push("/register")}
+  style={styles.registerSeasonBtn}
+>
+  <Text style={styles.registerSeasonBtnText}>Register for Season 6</Text>
+</Pressable>
 
                 {/* Contact Card */}
                 <Pressable
@@ -1002,11 +1025,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
   } as any,
 
+  // ✅ FLOATING REGISTRATION BANNER (persists above everything, across all screen sizes)
+  registrationBanner: {
+    position: Platform.OS === "web" ? ("fixed" as any) : ("absolute" as any),
+    top: 0,
+    left: 0,
+    right: 0,
+    height: BANNER_HEIGHT,
+    backgroundColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    zIndex: 1000000 as any,
+    cursor: "pointer" as any,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.25)" as any,
+  } as any,
+
+  registrationBannerText: {
+    color: "#ffffff",
+    fontWeight: "900" as any,
+    fontSize: 13,
+    letterSpacing: 0.6,
+    textAlign: "center",
+  } as any,
+
   // ✅ MOBILE TOP BAR (MOBILE WEB ONLY)
   // FIX: Use "fixed" + huge zIndex so the hamburger cannot be hidden on iPhone portrait
   mobileTopBar: {
     position: "fixed" as any,
-    top: 0,
+    top: BANNER_HEIGHT,
     left: 0,
     right: 0,
     paddingTop: 14,
@@ -1551,6 +1598,28 @@ const styles = StyleSheet.create({
     maxWidth: 860,
     letterSpacing: 0.3,
   },
+
+  registerSeasonBtn: {
+    marginTop: 20,
+    width: "100%",
+    maxWidth: 600,
+    alignSelf: "center",
+    backgroundColor: "#16a34a",
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 28,
+    boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)" as any,
+    cursor: "pointer" as any,
+    alignItems: "center",
+  } as any,
+
+  registerSeasonBtnText: {
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: 1.6,
+    color: "#FFFFFF",
+    textAlign: "center",
+  } as any,
 
   membershipCard: {
     marginTop: 36,
