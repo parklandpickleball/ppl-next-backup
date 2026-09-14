@@ -41,6 +41,9 @@ export default function RegisterPage() {
   const [paymentChoice, setPaymentChoice] = useState("");
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
 
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [showPaymentMethodOptions, setShowPaymentMethodOptions] = useState(false);
+
   const [showPaymentSection, setShowPaymentSection] = useState(false);
 
   const [showPaymentMethods, setShowPaymentMethods] = useState(false);
@@ -66,6 +69,7 @@ export default function RegisterPage() {
     memberStatus.trim() !== "" &&
     hasPartner.trim() !== "" &&
     paymentChoice.trim() !== "" &&
+    paymentMethod.trim() !== "" &&
     (hasPartner !== "Yes" ||
       (partnerName.trim() !== "" && partnerPhone.trim() !== ""));
 
@@ -261,6 +265,34 @@ export default function RegisterPage() {
               )}
             </View>
 
+            <View style={{ width: "100%" }}>
+              <Pressable
+                onPress={() => setShowPaymentMethodOptions(!showPaymentMethodOptions)}
+                style={styles.input}
+              >
+                <Text style={styles.inputText}>
+                  {paymentMethod || "Payment Method: Zelle or PayPal?"}
+                </Text>
+              </Pressable>
+
+              {showPaymentMethodOptions && (
+                <View style={styles.dropdown}>
+                  {["Zelle", "PayPal"].map((item) => (
+                    <Pressable
+                      key={item}
+                      onPress={() => {
+                        setPaymentMethod(item);
+                        setShowPaymentMethodOptions(false);
+                      }}
+                      style={styles.dropdownItem}
+                    >
+                      <Text style={styles.inputText}>{item}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
             {canContinueToPayment && waiverAccepted && !showPaymentSection && (
               <Pressable
                 onPress={async () => {
@@ -280,6 +312,7 @@ export default function RegisterPage() {
                         partnerName,
                         partnerPhone,
                         paymentChoice,
+                        paymentMethod,
                         dueAmount,
                         waiverAccepted: true,
                         waiverAcceptedAt,

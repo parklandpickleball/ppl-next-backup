@@ -22,6 +22,7 @@ export default async function handler(req: any, res: any) {
       partnerName,
       partnerPhone,
       paymentChoice,
+      paymentMethod,
       dueAmount,
       waiverAccepted,
       waiverAcceptedAt,
@@ -42,6 +43,7 @@ Partner Name: ${partnerName || "N/A"}
 Partner Phone: ${partnerPhone || "N/A"}
 
 Payment Choice: ${paymentChoice}
+Payment Method: ${paymentMethod || "N/A"}
 Amount Due: ${dueAmount || "N/A"}
 
 Waiver Accepted: ${waiverAccepted ? "YES" : "NO"}
@@ -60,7 +62,7 @@ ${waiverText || "N/A"}
         "parklandpickleballleague@gmail.com",
         "brandon.reich@yahoo.com"
       ],
-      subject: "New PPL Registration",
+      subject: `New PPL Registration — Paying via ${paymentMethod || "?"}`,
       text: emailContent,
     });
 
