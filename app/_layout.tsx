@@ -98,38 +98,57 @@ export default function RootLayout() {
         setNeedsTeam(false);
         setNeedsPlayer(false);
       } else {
-        // ✅ If local says team is set, verify Supabase agrees
-        if (localTeamId) {
-          const userRes = await supabase.auth.getUser();
-          const uid = userRes.data.user?.id ?? null;
-          if (uid) {
-            const { data: profile } = await supabase
-              .from("user_season_profiles")
-              .select("team_id")
-              .eq("user_id", uid)
-              .eq("season_id", currentSeasonId)
-              .maybeSingle();
+        let effectiveTeamId = localTeamId;
+        let effectivePlayerName = localPlayerName;
 
-            if (!profile?.team_id) {
-              if (Platform.OS === "web") {
-                window?.localStorage?.removeItem(LOCAL_TEAM_KEY);
-                window?.localStorage?.removeItem(LOCAL_PLAYER_KEY);
-              } else {
-                await SecureStore.deleteItemAsync(LOCAL_TEAM_KEY);
-                await SecureStore.deleteItemAsync(LOCAL_PLAYER_KEY);
-              }
-              setLocked(false);
-              setNeedsTeam(true);
-              setNeedsPlayer(false);
-              setReady(true);
-              return;
+        const userRes = await supabase.auth.getUser();
+        const uid = userRes.data.user?.id ?? null;
+
+        if (uid) {
+          // ✅ Reconcile local cache against Supabase in BOTH directions:
+          //   - local says a team is set but Supabase disagrees -> clear local (stale)
+          //   - local has nothing but Supabase already has a team/player (e.g. a
+          //     fresh browser, or local storage was cleared) -> adopt Supabase's
+          //     answer instead of wrongly concluding "needs team"
+          // Skipping the second direction was the root cause of the choose-team /
+          // choose-player / schedule redirect loop: this layout would decide
+          // needsTeam=true from an empty local cache, redirect to choose-team,
+          // which would find the DB profile already complete and redirect onward,
+          // while this layout's own needsTeam stayed stuck at true until the next
+          // foreground check — bouncing between the three screens.
+          const { data: profile } = await supabase
+            .from("user_season_profiles")
+            .select("team_id, player_name")
+            .eq("user_id", uid)
+            .eq("season_id", currentSeasonId)
+            .maybeSingle();
+
+          if (localTeamId && !profile?.team_id) {
+            if (Platform.OS === "web") {
+              window?.localStorage?.removeItem(LOCAL_TEAM_KEY);
+              window?.localStorage?.removeItem(LOCAL_PLAYER_KEY);
+            } else {
+              await SecureStore.deleteItemAsync(LOCAL_TEAM_KEY);
+              await SecureStore.deleteItemAsync(LOCAL_PLAYER_KEY);
+            }
+            effectiveTeamId = "";
+            effectivePlayerName = "";
+          } else if (!localTeamId && profile?.team_id) {
+            effectiveTeamId = profile.team_id;
+            effectivePlayerName = profile.player_name ?? "";
+            if (Platform.OS === "web") {
+              window?.localStorage?.setItem(LOCAL_TEAM_KEY, effectiveTeamId);
+              if (effectivePlayerName) window?.localStorage?.setItem(LOCAL_PLAYER_KEY, effectivePlayerName);
+            } else {
+              await SecureStore.setItemAsync(LOCAL_TEAM_KEY, effectiveTeamId);
+              if (effectivePlayerName) await SecureStore.setItemAsync(LOCAL_PLAYER_KEY, effectivePlayerName);
             }
           }
         }
 
         setLocked(false);
-        setNeedsTeam(!localTeamId);
-        setNeedsPlayer(!!localTeamId && !localPlayerName);
+        setNeedsTeam(!effectiveTeamId);
+        setNeedsPlayer(!!effectiveTeamId && !effectivePlayerName);
       }
 
       setReady(true);

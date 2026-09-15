@@ -74,6 +74,14 @@ export default function ChooseTeamScreen() {
             .maybeSingle();
 
           if (profile?.team_id) {
+            // ✅ Persist locally too — otherwise the root layout's gate (which reads
+            // localStorage, not the DB) never learns a team is already set and can
+            // bounce back here even after this redirect.
+            if (Platform.OS === "web") {
+              window?.localStorage?.setItem(LOCAL_TEAM_KEY, profile.team_id);
+            } else {
+              await SecureStore.setItemAsync(LOCAL_TEAM_KEY, profile.team_id);
+            }
             router.replace("/choose-player" as any);
             return;
           }

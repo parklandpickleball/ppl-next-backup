@@ -17,6 +17,7 @@ type PlayerOption = {
 };
 const WEB_LAST_PLAYER_KEY = "PPL_WEB_LAST_PLAYER_NAME_V1";
 const LOCAL_PLAYER_KEY = "PPL_LOCAL_PLAYER_NAME_V1";
+const LOCAL_TEAM_KEY = "PPL_LOCAL_TEAM_ID_V1";
 
 export default function ChoosePlayerScreen() {
   const router = useRouter();
@@ -84,6 +85,16 @@ if (user) {
     .maybeSingle();
 
   if (profile?.player_name) {
+    // ✅ Persist locally too — otherwise the root layout's gate (which reads
+    // localStorage, not the DB) never learns a team/player are already set and
+    // can bounce back to choose-team/choose-player even after this redirect.
+    if (Platform.OS === "web") {
+      window?.localStorage?.setItem(LOCAL_TEAM_KEY, teamId);
+      window?.localStorage?.setItem(LOCAL_PLAYER_KEY, profile.player_name);
+    } else {
+      await SecureStore.setItemAsync(LOCAL_TEAM_KEY, teamId);
+      await SecureStore.setItemAsync(LOCAL_PLAYER_KEY, profile.player_name);
+    }
     router.replace("/(tabs)/schedule" as any);
     return;
   }
