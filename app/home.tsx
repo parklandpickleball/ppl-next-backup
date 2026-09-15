@@ -504,9 +504,9 @@ export default function Home() {
   </Text>
 
   {[
-    { name: 'Beginner', rating: '2.0', spots: 16 },
-    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 16 },
-    { name: 'Intermediate Gold', rating: '3.5', spots: 16 },
+    { name: 'Beginner', rating: '2.0', spots: 13 },
+    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 13 },
+    { name: 'Intermediate Gold', rating: '3.5', spots: 12 },
     { name: 'Advanced', rating: '4.0+', spots: 14 },
   ].map((div) => {
     return (
