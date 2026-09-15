@@ -523,18 +523,27 @@ export default function StandingsScreen() {
       byDivisionName[divName].push(t);
     }
 
-    // ✅ Division order (your requirement): Advanced, Intermediate, Beginner
-    const DIVISION_ORDER = ["Advanced", "Intermediate", "Beginner"];
+    // ✅ Division order (your requirement): Advanced, Intermediate Gold, Intermediate Silver, Beginner.
+    // Matches by keyword so it works whether a season's divisions are named "Intermediate"
+    // or split into "Intermediate Silver"/"Intermediate Gold".
+    const divisionRank = (name: string): number => {
+      const n = name.trim().toLowerCase();
+      if (n.includes("beginner")) return 0;
+      if (n.includes("gold")) return 2;
+      if (n.includes("silver") || n.includes("intermediate")) return 1;
+      if (n.includes("advanced")) return 3;
+      return -1;
+    };
 
     const divisionNames = Object.keys(byDivisionName).sort((a, b) => {
-      const ai = DIVISION_ORDER.indexOf(a);
-      const bi = DIVISION_ORDER.indexOf(b);
+      const ai = divisionRank(a);
+      const bi = divisionRank(b);
 
       if (ai === -1 && bi === -1) return a.localeCompare(b);
       if (ai === -1) return 1;
       if (bi === -1) return -1;
 
-      return ai - bi;
+      return bi - ai;
     });
 
     return divisionNames.map((divisionName) => {

@@ -107,24 +107,10 @@ function formatWeekDate(iso: string | null): string {
   return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 }
 
+// ✅ Default to the latest (highest-numbered) week saved in Schedule Builder.
 function pickDefaultWeek(weeks: ScheduleWeekRow[]): number | null {
   if (!weeks.length) return null;
-
-  const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-
-  const dated = weeks
-    .filter((w) => !!w.week_date && !isNaN(new Date(`${w.week_date as string}T00:00:00`).getTime()))
-    .map((w) => ({ week: w.week, time: new Date(`${w.week_date as string}T00:00:00`).getTime() }))
-    .sort((a, b) => a.time - b.time);
-
-  if (dated.length) {
-    const past = dated.filter((w) => w.time <= todayStart);
-    if (past.length) return past[past.length - 1].week;
-    return dated[0].week;
-  }
-
-  return [...weeks].sort((a, b) => a.week - b.week)[weeks.length - 1].week;
+  return weeks.reduce((max, w) => (w.week > max ? w.week : max), weeks[0].week);
 }
 
 export default function ScheduleScreen() {
@@ -413,22 +399,22 @@ const { data: matchRows, error: matchErr } = await q
       map[divName].push(m);
     });
 
-    // ✅ Division order: Beginner, Intermediate, Advanced, then alphabetical for anything else
-    const DIVISION_ORDER: Record<string, number> = {
-      beginner: 0,
-      intermediate: 1,
-      advanced: 2,
+    // ✅ Division order: Beginner, Intermediate Silver, Intermediate Gold, Advanced,
+    // then alphabetical for anything else. Matches by keyword so it works whether a
+    // season's divisions are named "Intermediate" or split into Silver/Gold.
+    const divisionRank = (name: string): number => {
+      const n = name.trim().toLowerCase();
+      if (n.includes("beginner")) return 0;
+      if (n.includes("gold")) return 2;
+      if (n.includes("silver") || n.includes("intermediate")) return 1;
+      if (n.includes("advanced")) return 3;
+      return 999;
     };
-
-    const normalize = (s: string) => s.trim().toLowerCase();
 
     Object.keys(map)
       .sort((a, b) => {
-        const aKey = normalize(a);
-        const bKey = normalize(b);
-
-        const aRank = DIVISION_ORDER[aKey] ?? 999;
-        const bRank = DIVISION_ORDER[bKey] ?? 999;
+        const aRank = divisionRank(a);
+        const bRank = divisionRank(b);
 
         if (aRank !== bRank) return aRank - bRank;
         return a.localeCompare(b);

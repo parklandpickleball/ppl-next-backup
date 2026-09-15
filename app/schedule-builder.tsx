@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Modal,
@@ -15,16 +15,25 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { supabase } from "../constants/supabaseClient";
 
-const DIVISION_ORDER: Record<string, number> = {
-  Advanced: 0,
-  Intermediate: 1,
-  Beginner: 2,
-};
+// ✅ Division display order: Beginner, Intermediate Silver, Intermediate Gold, Advanced.
+// Matches by keyword (not exact name) so it works whether a season's divisions are
+// named "Intermediate" (older seasons) or split into "Intermediate Silver"/"Intermediate Gold".
+function divisionRank(name: string): number {
+  const n = name.trim().toLowerCase();
+  if (n.includes("beginner")) return 0;
+  if (n.includes("gold")) return 2;
+  if (n.includes("silver") || n.includes("intermediate")) return 1;
+  if (n.includes("advanced")) return 3;
+  return 999;
+}
 
 const FALLBACK_SEASON_ID = "60e682dc-25db-4480-a924-f326755eef79";
 
 // ✅ WEB ONLY: remember last selected week after refresh (NO AsyncStorage, NO router)
 const STORAGE_KEY_SELECTED_WEEK = "SB_SELECTED_WEEK_V1";
+
+// ✅ WEB ONLY: remember the last date shown in the calendar box, across tab navigation
+const STORAGE_KEY_SELECTED_DATE = "SB_SELECTED_DATE_V1";
 
 type WeekItem = { label: string; weekNumber: number; weekDate?: string | null };
 
@@ -203,6 +212,24 @@ function saveWeekNumber(n: number) {
     window.localStorage.setItem(STORAGE_KEY_SELECTED_WEEK, String(n));
   } catch {}
 }
+
+function getSavedDate(): string | null {
+  if (Platform.OS !== "web") return null;
+  try {
+    const v = window.localStorage.getItem(STORAGE_KEY_SELECTED_DATE);
+    if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+    return v;
+  } catch {
+    return null;
+  }
+}
+
+function saveDate(iso: string) {
+  if (Platform.OS !== "web") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY_SELECTED_DATE, iso);
+  } catch {}
+}
 function showAlert(title: string, message: string) {
   if (Platform.OS === "web") {
     // eslint-disable-next-line no-alert
@@ -239,8 +266,16 @@ const urlWeekNum = useMemo(() => {
   const [newWeekText, setNewWeekText] = useState("");
 
   const [datePanelOpen, setDatePanelOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [webDate, setWebDate] = useState<string>(() => ymdFromDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const saved = getSavedDate();
+    if (saved) {
+      const [y, m, d] = saved.split("-").map(Number);
+      const dt = new Date(y, m - 1, d);
+      if (!isNaN(dt.getTime())) return dt;
+    }
+    return new Date();
+  });
+  const [webDate, setWebDate] = useState<string>(() => getSavedDate() ?? ymdFromDate(new Date()));
 
   const [divisions, setDivisions] = useState<DivisionRow[]>([]);
   const [teams, setTeams] = useState<TeamRow[]>([]);
@@ -378,26 +413,17 @@ if (urlWeekNum && mapped.length > 0) {
         return;
       }
 
-      const DIVISION_ORDER_LOCAL: Record<string, number> = {
-        Beginner: 0,
-        Intermediate: 1,
-        Advanced: 2,
-      };
-
       const list: DivisionRow[] = (res.data ?? [])
         .map((d: any) => ({
           id: String(d.id),
           name: String(d.name ?? "Division"),
         }))
         .sort((a, b) => {
-          const aName = a.name.trim();
-          const bName = b.name.trim();
-
-          const aRank = DIVISION_ORDER_LOCAL[aName] ?? 999;
-          const bRank = DIVISION_ORDER_LOCAL[bName] ?? 999;
+          const aRank = divisionRank(a.name);
+          const bRank = divisionRank(b.name);
 
           if (aRank !== bRank) return aRank - bRank;
-          return aName.localeCompare(bName);
+          return a.name.trim().localeCompare(b.name.trim());
         });
 
       setDivisions(list);
@@ -486,7 +512,16 @@ if (urlWeekNum && mapped.length > 0) {
   // saving a date change — which snapped the date box back to the old value.
   // Now that each match stores its own date, the week-level date is just a
   // starting point for a newly-selected week, not something to keep re-syncing to.)
+  const isFirstWeekSync = useRef(true);
   useEffect(() => {
+    const wasFirstRun = isFirstWeekSync.current;
+    isFirstWeekSync.current = false;
+
+    // ✅ On the very first sync after mount, if we restored a saved calendar date
+    // from a previous visit, keep showing it instead of snapping to this week's
+    // stored date. (Restores the calendar box across tab navigation.)
+    if (wasFirstRun && getSavedDate()) return;
+
     if (!selectedWeek?.weekDate) return;
     const [y, m, d] = String(selectedWeek.weekDate).split("-").map(Number);
     if (!y || !m || !d) return;
@@ -499,6 +534,13 @@ if (urlWeekNum && mapped.length > 0) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedWeek?.weekNumber]);
+
+  // ✅ WEB ONLY: keep the calendar box's date saved so it survives navigating away
+  // from Schedule Builder and back, instead of resetting to today.
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    saveDate(webDate);
+  }, [webDate]);
 
   const formattedDate = useMemo(() => formatDateLong(selectedDate), [selectedDate]);
   const bannerText = selectedWeek
