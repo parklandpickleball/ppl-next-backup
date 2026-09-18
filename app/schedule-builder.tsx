@@ -507,20 +507,21 @@ if (urlWeekNum && mapped.length > 0) {
   }, [seasonId, selectedWeek, loadAttendance, loadMatches]);
 
   /* ------------------ SYNC DATE ------------------ */
-  // ✅ Only reset the date box when you switch to a DIFFERENT week number.
-  // (Previously this re-ran on every reload of the SAME week — e.g. right after
-  // saving a date change — which snapped the date box back to the old value.
-  // Now that each match stores its own date, the week-level date is just a
-  // starting point for a newly-selected week, not something to keep re-syncing to.)
-  const isFirstWeekSync = useRef(true);
+  // ✅ Only reset the date box when you switch from one already-loaded week to a
+  // DIFFERENT real week — never on the initial load of a week. That means the date
+  // box keeps whatever it already had (restored from localStorage, or today's date)
+  // the first time a week loads, and only jumps to a week's stored date when you
+  // deliberately pick a different week afterward.
+  const prevWeekNumberRef = useRef<number | null>(null);
   useEffect(() => {
-    const wasFirstRun = isFirstWeekSync.current;
-    isFirstWeekSync.current = false;
+    const currentWeekNumber = selectedWeek?.weekNumber ?? null;
+    const prevWeekNumber = prevWeekNumberRef.current;
+    prevWeekNumberRef.current = currentWeekNumber;
 
-    // ✅ On the very first sync after mount, if we restored a saved calendar date
-    // from a previous visit, keep showing it instead of snapping to this week's
-    // stored date. (Restores the calendar box across tab navigation.)
-    if (wasFirstRun && getSavedDate()) return;
+    // No prior real week to compare against yet (initial load, or nothing selected) — leave the date box alone.
+    if (prevWeekNumber == null) return;
+    // Not an actual change to a different week — nothing to do.
+    if (currentWeekNumber == null || currentWeekNumber === prevWeekNumber) return;
 
     if (!selectedWeek?.weekDate) return;
     const [y, m, d] = String(selectedWeek.weekDate).split("-").map(Number);
@@ -532,8 +533,7 @@ if (urlWeekNum && mapped.length > 0) {
         setWebDate(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedWeek?.weekNumber]);
+  }, [selectedWeek?.weekNumber, selectedWeek?.weekDate]);
 
   // ✅ WEB ONLY: keep the calendar box's date saved so it survives navigating away
   // from Schedule Builder and back, instead of resetting to today.
