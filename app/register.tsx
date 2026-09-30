@@ -54,6 +54,8 @@ export default function RegisterPage() {
   const [waiverAccepted, setWaiverAccepted] = useState(false);
   const [waiverAcceptedAt, setWaiverAcceptedAt] = useState("");
 
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+
   const dueAmount = (() => {
     const isTeam = paymentChoice === "Myself and My Partner";
     const isNew = memberStatus === "New Member";
@@ -320,7 +322,7 @@ export default function RegisterPage() {
                       }),
                     });
 
-                    setShowPaymentSection(true);
+                    setShowConfirmationModal(true);
                   } catch (error) {
                     console.error("Error sending registration:", error);
                   }
@@ -494,6 +496,36 @@ export default function RegisterPage() {
               style={styles.modalAgreeBtn}
             >
               <Text style={styles.modalAgreeBtnText}>I Agree</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showConfirmationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Registration Received!</Text>
+
+            <Text style={styles.modalBody}>
+              Thanks, {fullName.trim().split(/\s+/)[0] || "there"} — you're
+              registered for Season 6 in the {division} division. Next,
+              submit your payment below using Zelle or PayPal to lock in
+              your spot.
+            </Text>
+
+            <Pressable
+              onPress={() => {
+                setShowConfirmationModal(false);
+                setShowPaymentSection(true);
+              }}
+              style={styles.modalAgreeBtn}
+            >
+              <Text style={styles.modalAgreeBtnText}>Continue to Payment</Text>
             </Pressable>
           </View>
         </View>
