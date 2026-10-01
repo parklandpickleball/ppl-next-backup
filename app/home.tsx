@@ -504,10 +504,10 @@ export default function Home() {
   </Text>
 
   {[
-    { name: 'Beginner', rating: '2.0', spots: 9 },
-    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 12 },
-    { name: 'Intermediate Gold', rating: '3.5', spots: 10 },
-    { name: 'Advanced', rating: '4.0+', spots: 14 },
+    { name: 'Beginner', rating: '2.0', spots: 5 },
+    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 6 },
+    { name: 'Intermediate Gold', rating: '3.5', spots: 2 },
+    { name: 'Advanced', rating: '4.0+', spots: 11 },
   ].map((div) => {
     return (
     <View key={div.name} style={{
