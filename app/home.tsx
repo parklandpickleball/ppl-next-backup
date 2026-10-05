@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../constants/supabaseClient";
+import { SEASON_DIVISIONS } from "../constants/seasonDivisions";
 
 const LOGO = require("../assets/images/icon.png");
 const HERO_BG = require("../assets/images/hero.jpg");
@@ -503,34 +504,40 @@ export default function Home() {
     Season 6 Registration Status
   </Text>
 
-  {[
-    { name: 'Beginner', rating: '2.0', spots: 5 },
-    { name: 'Intermediate Silver', rating: '2.5–3.0', spots: 6 },
-    { name: 'Intermediate Gold', rating: '3.5', spots: 2 },
-    { name: 'Advanced', rating: '4.0+', spots: 11 },
-  ].map((div) => {
+  {SEASON_DIVISIONS.map((div) => {
+    const soldOut = div.spots <= 0;
     return (
     <View key={div.name} style={{
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: '#fff',
+      backgroundColor: soldOut ? '#fef2f2' : '#fff',
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: '#e2e8f0',
+      borderColor: soldOut ? '#fca5a5' : '#e2e8f0',
       paddingVertical: 12,
       paddingHorizontal: 14,
       marginBottom: 8,
+      opacity: soldOut ? 0.85 : 1,
     }}>
       <View style={{ flex: 1, marginRight: 10 }}>
-        <Text style={{ fontWeight: '800', fontSize: 17, color: '#0F172A' }}>{div.name}</Text>
+        <Text style={{ fontWeight: '800', fontSize: 17, color: soldOut ? '#991b1b' : '#0F172A' }}>{div.name}</Text>
         <Text style={{ fontSize: 14, color: '#888', marginTop: 2 }}>Rating: {div.rating}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
-        <View style={{ backgroundColor: '#dcfce7', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
-          <Text style={{ fontWeight: '900', fontSize: 13, color: '#16a34a', letterSpacing: 1 }}>OPEN</Text>
-        </View>
-        <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} {div.spots === 1 ? 'spot' : 'spots'} remaining</Text>
+        {soldOut ? (
+          <View style={{ backgroundColor: '#fee2e2', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 12 }}>🔒</Text>
+            <Text style={{ fontWeight: '900', fontSize: 13, color: '#dc2626', letterSpacing: 1 }}>SOLD OUT</Text>
+          </View>
+        ) : (
+          <View style={{ backgroundColor: '#dcfce7', borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10, marginBottom: 4 }}>
+            <Text style={{ fontWeight: '900', fontSize: 13, color: '#16a34a', letterSpacing: 1 }}>OPEN</Text>
+          </View>
+        )}
+        {!soldOut && (
+          <Text style={{ fontSize: 14, color: '#555', fontWeight: '600' }}>{div.spots} {div.spots === 1 ? 'spot' : 'spots'} remaining</Text>
+        )}
       </View>
     </View>
     );

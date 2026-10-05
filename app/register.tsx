@@ -10,6 +10,7 @@ import {
   Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { SEASON_DIVISIONS } from "../constants/seasonDivisions";
 
 const WAIVER_TEXT = `Waiver & Release of Liability
 
@@ -141,18 +142,26 @@ export default function RegisterPage() {
 
               {showDivisionOptions && (
                 <View style={styles.dropdown}>
-                  {["Beginner (2.0)", "Intermediate Silver (2.5–3.0)", "Intermediate Gold (3.5)", "Advanced (4.0+)"].map((item) => (
-                    <Pressable
-                      key={item}
-                      onPress={() => {
-                        setDivision(item);
-                        setShowDivisionOptions(false);
-                      }}
-                      style={styles.dropdownItem}
-                    >
-                      <Text style={styles.inputText}>{item}</Text>
-                    </Pressable>
-                  ))}
+                  {SEASON_DIVISIONS.map((d) => {
+                    const label = `${d.name} (${d.rating})`;
+                    const soldOut = d.spots <= 0;
+                    return (
+                      <Pressable
+                        key={label}
+                        disabled={soldOut}
+                        onPress={() => {
+                          if (soldOut) return;
+                          setDivision(label);
+                          setShowDivisionOptions(false);
+                        }}
+                        style={[styles.dropdownItem, soldOut && { backgroundColor: "#fef2f2" }]}
+                      >
+                        <Text style={[styles.inputText, soldOut && { color: "#991b1b" }]}>
+                          {soldOut ? `🔒 ${label} — Sold Out` : label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               )}
             </View>
