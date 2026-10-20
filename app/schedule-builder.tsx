@@ -788,6 +788,20 @@ if (urlWeekNum && mapped.length > 0) {
     return s;
   }, [matches, selectedTimeMinutes, selectedDateIso]);
 
+  // ✅ How many matches each team already has on the currently selected date (tonight),
+  // across ALL time slots — not just the one currently being viewed. Lets the admin see,
+  // while picking teams, who's already gotten their matches in for the night (e.g. with an
+  // odd number of teams needing a 2nd/catch-up round) without flipping between time slots.
+  const matchesTonightCountByTeamId = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of matches) {
+      if (m.date !== selectedDateIso) continue;
+      counts.set(m.team_a_id, (counts.get(m.team_a_id) ?? 0) + 1);
+      counts.set(m.team_b_id, (counts.get(m.team_b_id) ?? 0) + 1);
+    }
+    return counts;
+  }, [matches, selectedDateIso]);
+
   /* ------------------ ✅ BADGE COUNTS ACROSS ALL WEEKS ------------------ */
   const priorCountByMatchId = useMemo(() => {
     const list = [...seasonMatches].sort((a, b) => {
@@ -1532,7 +1546,7 @@ setTeamBTooltipData(null);
         <Text style={styles.label}>Team A</Text>
         <Text style={styles.helperText}>
           Grey ✖ = not fully IN (attendance). Yellow = already scheduled at this time. INACTIVE teams are grey and
-          unclickable.
+          unclickable. The number badge = matches already scheduled tonight (red at 2+).
         </Text>
 
         <View style={styles.teamWrap}>
@@ -1544,6 +1558,7 @@ setTeamBTooltipData(null);
             const inactive = t.is_active === false;
 
             const disabled = isTeamDisabledForPick(t.id, teamBId);
+            const nightCount = matchesTonightCountByTeamId.get(t.id) ?? 0;
 
             return (
               <Pressable
@@ -1559,6 +1574,10 @@ setTeamBTooltipData(null);
                   disabled && !selected && styles.teamChipDisabled,
                 ]}
               >
+                <View style={[styles.teamNightBadge, nightCount >= 2 && styles.teamNightBadgeWarn]}>
+                  <Text style={styles.teamNightBadgeText}>{nightCount}</Text>
+                </View>
+
                 <Text
                   style={[
                     styles.teamChipText,
@@ -1602,6 +1621,7 @@ setTeamBTooltipData(null);
             const inactive = t.is_active === false;
 
             const disabled = isTeamDisabledForPick(t.id, teamAId);
+            const nightCount = matchesTonightCountByTeamId.get(t.id) ?? 0;
 
             return (
               <Pressable
@@ -1617,6 +1637,10 @@ setTeamBTooltipData(null);
                   disabled && !selected && styles.teamChipDisabled,
                 ]}
               >
+                <View style={[styles.teamNightBadge, nightCount >= 2 && styles.teamNightBadgeWarn]}>
+                  <Text style={styles.teamNightBadgeText}>{nightCount}</Text>
+                </View>
+
                 <Text
                   style={[
                     styles.teamChipText,
@@ -2012,7 +2036,26 @@ const styles = StyleSheet.create({
     borderColor: "#cfe8d2",
     minWidth: 150,
     alignItems: "center",
+    position: "relative",
   },
+  // ✅ Count of matches this team already has on the selected date (all time slots),
+  // so the admin can see who's already done for the night while picking teams.
+  teamNightBadge: {
+    position: "absolute",
+    right: 6,
+    top: 6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    backgroundColor: "#9ca3af",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  teamNightBadgeWarn: {
+    backgroundColor: "#dc2626",
+  },
+  teamNightBadgeText: { color: "#fff", fontWeight: "900", fontSize: 11 },
   teamChipSelected: {
     backgroundColor: "#000",
     borderColor: "#000",
