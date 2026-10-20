@@ -66,6 +66,37 @@ ${waiverText || "N/A"}
       text: emailContent,
     });
 
+    // ✅ Confirmation email to the registrant themselves — best-effort, so a
+    // problem here (e.g. a malformed email address) never blocks the admin
+    // notification above or fails the whole request.
+    if (email) {
+      try {
+        const firstName = String(fullName || "").trim().split(/\s+/)[0] || "there";
+
+        const confirmationText = `Hi ${firstName},
+
+You're officially registered for the Parkland Pickleball League, Season 6!
+
+Division: ${division}
+Amount Due: ${dueAmount || "N/A"}
+Payment Method: ${paymentMethod || "N/A"}
+
+If you haven't submitted payment yet, please do so to secure your spot — instructions are on the registration page. Questions? Just reply to this email or reach out to the League Commissioner.
+
+See you on the courts!
+Parkland Pickleball League`;
+
+        await resend.emails.send({
+          from: "noreply@parklandpb.com",
+          to: [email],
+          subject: "You're Registered — PPL Season 6",
+          text: confirmationText,
+        });
+      } catch (confirmationError) {
+        console.error("Confirmation email failed:", confirmationError);
+      }
+    }
+
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error("ERROR:", error);

@@ -10,6 +10,7 @@ import {
   Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { SEASON_DIVISIONS } from "../constants/seasonDivisions";
 
 const WAIVER_TEXT = `Waiver & Release of Liability
 
@@ -53,6 +54,8 @@ export default function RegisterPage() {
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [waiverAccepted, setWaiverAccepted] = useState(false);
   const [waiverAcceptedAt, setWaiverAcceptedAt] = useState("");
+
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
   const dueAmount = (() => {
     const isTeam = paymentChoice === "Myself and My Partner";
@@ -139,18 +142,26 @@ export default function RegisterPage() {
 
               {showDivisionOptions && (
                 <View style={styles.dropdown}>
-                  {["Beginner (2.0)", "Intermediate Silver (2.5–3.0)", "Intermediate Gold (3.5)", "Advanced (4.0+)"].map((item) => (
-                    <Pressable
-                      key={item}
-                      onPress={() => {
-                        setDivision(item);
-                        setShowDivisionOptions(false);
-                      }}
-                      style={styles.dropdownItem}
-                    >
-                      <Text style={styles.inputText}>{item}</Text>
-                    </Pressable>
-                  ))}
+                  {SEASON_DIVISIONS.map((d) => {
+                    const label = `${d.name} (${d.rating})`;
+                    const soldOut = d.spots <= 0;
+                    return (
+                      <Pressable
+                        key={label}
+                        disabled={soldOut}
+                        onPress={() => {
+                          if (soldOut) return;
+                          setDivision(label);
+                          setShowDivisionOptions(false);
+                        }}
+                        style={[styles.dropdownItem, soldOut && { backgroundColor: "#fef2f2" }]}
+                      >
+                        <Text style={[styles.inputText, soldOut && { color: "#991b1b" }]}>
+                          {soldOut ? `🔒 ${label} — Sold Out` : label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               )}
             </View>
@@ -320,7 +331,7 @@ export default function RegisterPage() {
                       }),
                     });
 
-                    setShowPaymentSection(true);
+                    setShowConfirmationModal(true);
                   } catch (error) {
                     console.error("Error sending registration:", error);
                   }
@@ -494,6 +505,36 @@ export default function RegisterPage() {
               style={styles.modalAgreeBtn}
             >
               <Text style={styles.modalAgreeBtnText}>I Agree</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showConfirmationModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Registration Received!</Text>
+
+            <Text style={styles.modalBody}>
+              Thanks, {fullName.trim().split(/\s+/)[0] || "there"} — you're
+              registered for Season 6 in the {division} division. Next,
+              submit your payment below using Zelle or PayPal to lock in
+              your spot.
+            </Text>
+
+            <Pressable
+              onPress={() => {
+                setShowConfirmationModal(false);
+                setShowPaymentSection(true);
+              }}
+              style={styles.modalAgreeBtn}
+            >
+              <Text style={styles.modalAgreeBtnText}>Continue to Payment</Text>
             </Pressable>
           </View>
         </View>
