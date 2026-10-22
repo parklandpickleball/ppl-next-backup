@@ -2,7 +2,7 @@
   "expo": {
     "name": "parkland-pickleball-league-next",
     "slug": "parkland-pickleball-league-next",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "parklandpickleballleaguenext",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.parklandpickleballleague.app",
-      "buildNumber": "20",
+      "buildNumber": "21",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
