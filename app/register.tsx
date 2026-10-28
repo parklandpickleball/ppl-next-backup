@@ -57,6 +57,8 @@ export default function RegisterPage() {
 
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
 
+  const registrationClosed = SEASON_DIVISIONS.every((d) => d.spots <= 0);
+
   const dueAmount = (() => {
     const isTeam = paymentChoice === "Myself and My Partner";
     const isNew = memberStatus === "New Member";
@@ -108,6 +110,18 @@ export default function RegisterPage() {
         <View style={styles.container}>
           <Text style={styles.title}>Register for Season</Text>
 
+          {registrationClosed && (
+            <View style={styles.closedCard}>
+              <Text style={styles.closedTitle}>Registration is Closed</Text>
+              <Text style={styles.closedBody}>
+                All divisions for Season 6 are full. Check back for Season 7
+                registration, or contact the League Commissioner with any
+                questions.
+              </Text>
+            </View>
+          )}
+
+          {!registrationClosed && (
           <View style={styles.form}>
             <TextInput
               placeholder="Full Name"
@@ -471,6 +485,7 @@ export default function RegisterPage() {
               </View>
             )}
           </View>
+          )}
 
           <Pressable onPress={() => router.push("/")} style={styles.backBtn}>
             <Text style={styles.backBtnText}>Back to Home</Text>
@@ -593,6 +608,33 @@ const styles = StyleSheet.create({
     marginTop: 24,
     width: "100%",
     maxWidth: 500,
+  },
+
+  closedCard: {
+    marginTop: 24,
+    width: "100%",
+    maxWidth: 500,
+    backgroundColor: "#fef2f2",
+    borderWidth: 2,
+    borderColor: "#fca5a5",
+    borderRadius: 14,
+    padding: 20,
+    alignItems: "center",
+  },
+
+  closedTitle: {
+    fontSize: 20,
+    fontWeight: "900",
+    color: "#991b1b",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+
+  closedBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#7f1d1d",
+    textAlign: "center",
   },
 
   input: {
