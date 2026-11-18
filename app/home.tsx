@@ -661,6 +661,12 @@ export default function Home() {
                     url="https://prosanitizesolutions.com/"
                     logo={require("../assets/images/Sponsors/ProSanitize.png")}
                   />
+                  <SponsorCard
+                    isMobile={isMobileWeb}
+                    name="J Alexander Group"
+                    url="https://jalexandergroup.com/"
+                    logo={require("../assets/images/Sponsors/JAlexanderGroup.png")}
+                  />
                 </View>
               </View>
             </View>
